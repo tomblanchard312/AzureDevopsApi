@@ -97,12 +97,25 @@ namespace ADOApi.Services
             string assignedUser,
             Nullable<int> priority,
             Nullable<double> remainingEffortHours,
-            Nullable<double> completedEffortHours)
+            Nullable<double> completedEffortHours,
+            string? tag)
         {
-            return await _workItemService.UpdateWorkItemAsync(workItemId, state, comment, assignedUser, priority, remainingEffortHours, completedEffortHours, _httpClient, _organization, _personalAccessToken);
+            return await _workItemService.UpdateWorkItemAsync(workItemId, state, comment, assignedUser, priority, remainingEffortHours, completedEffortHours, _httpClient, _organization, _personalAccessToken, tag);
+        }
+        /// <summary>
+        /// Retrieves all work items for a specified project.
+        /// </summary>
+        /// <param name="project">The project name to retrieve work items from.</param>
+        /// <returns>A list of work items.</returns>
+        public async Task<List<WorkItem>> GetAllWorkItemsForProjectAsync(string project)
+        {
+            return await _queryService.GetAllWorkItemsForProjectAsync(project, _httpClient, _organization, _personalAccessToken);
+        }
+        public async Task<List<WorkItem>> GetMyAssignedWorkItemsAsync(string project, string userIdentifier) {
+            return await _queryService.GetMyAssignedWorkItemsAsync(project, _httpClient, _organization, _personalAccessToken, userIdentifier);
         }
 
-        Task<List<WorkItem>> IAzureDevOpsService.GetWorkItemsByTypeAsync(string project, string workItemType)
+        public Task<bool> UpdateWorkItemAsync(int workItemId, string state, string comment, string assignedUser, int? priority, double? remainingEffortHours, double? completedEffortHours)
         {
             throw new NotImplementedException();
         }

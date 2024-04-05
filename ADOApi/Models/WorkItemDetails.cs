@@ -13,19 +13,19 @@
         public int Id { get; set; }
 
         [JsonProperty("rev")]
-        public int Revision { get; set; }
+        public int? Revision { get; set; }
 
         [JsonProperty("fields")]
-        public Dictionary<string, object> Fields { get; set; }
+        public Dictionary<string, object>? Fields { get; set; }
 
         [JsonProperty("relations")]
-        public List<WorkItemRelation> Relations { get; set; }
+        public List<WorkItemRelation>? Relations { get; set; }
 
         [JsonProperty("_links")]
-        public WorkItemLinks Links { get; set; }
+        public WorkItemLinks? Links { get; set; }
 
         [JsonProperty("url")]
-        public string Url { get; set; }
+        public string? Url { get; set; }
         public string? Title { get; internal set; }
         public string? IterationPath { get; internal set; }
         public List<WorkItemDetails> Parents { get; internal set; }
@@ -42,42 +42,42 @@
     public class WorkItemRelation
     {
         [JsonProperty("rel")]
-        public string Rel { get; set; }
+        public string? Rel { get; set; }
 
         [JsonProperty("url")]
-        public string Url { get; set; }
+        public string? Url { get; set; }
 
         [JsonProperty("attributes")]
-        public Dictionary<string, object> Attributes { get; set; }
+        public Dictionary<string, object>? Attributes { get; set; }
     }
 
     public class WorkItemLinks
     {
         [JsonProperty("self")]
-        public WorkItemLink Self { get; set; }
+        public WorkItemLink? Self { get; set; }
 
         [JsonProperty("workItemUpdates")]
-        public WorkItemLink WorkItemUpdates { get; set; }
+        public WorkItemLink? WorkItemUpdates { get; set; }
 
         [JsonProperty("workItemRevisions")]
-        public WorkItemLink WorkItemRevisions { get; set; }
+        public WorkItemLink? WorkItemRevisions { get; set; }
 
         [JsonProperty("workItemHistory")]
-        public WorkItemLink WorkItemHistory { get; set; }
+        public WorkItemLink? WorkItemHistory { get; set; }
 
         [JsonProperty("html")]
-        public WorkItemLink Html { get; set; }
+        public WorkItemLink? Html { get; set; }
 
         [JsonProperty("workItemType")]
-        public WorkItemLink WorkItemType { get; set; }
+        public WorkItemLink? WorkItemType { get; set; }
 
         [JsonProperty("fields")]
-        public WorkItemLink Fields { get; set; }
+        public WorkItemLink? Fields { get; set; }
     }
 
     public class WorkItemLink
     {
         [JsonProperty("href")]
-        public string Href { get; set; }
+        public string? Href { get; set; }
     }
 }

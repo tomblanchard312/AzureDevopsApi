@@ -16,5 +16,7 @@ namespace ADOApi.Interfaces
         Task<List<RecentWorkItem>> GetRecentWorkItemsAsync(HttpClient httpClient, string organization, string personalAccessToken);
         Task<WorkItem> GetWorkItemByIdAsync(int workItemId, string project, HttpClient httpClient, string organization, string personalAccessToken);
         Task<List<string>> GetProjectsAsync(HttpClient httpClient, string organization, string personalAccessToken);
+        Task<List<WorkItem>> GetAllWorkItemsForProjectAsync(string project, HttpClient httpClient, string organization, string personalAccessToken);
+        Task<List<WorkItem>> GetMyAssignedWorkItemsAsync(string project, HttpClient httpClient, string organization, string personalAccessToken, string userIdentifier);
     }
 }

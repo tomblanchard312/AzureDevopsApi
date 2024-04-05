@@ -310,5 +310,65 @@ namespace ADOApi.Services
 
             return projects;
         }
+
+        public async Task<List<WorkItem>> GetAllWorkItemsForProjectAsync(string project, HttpClient httpClient, string organization, string personalAccessToken)
+        {
+            var uri = new Uri($"https://dev.azure.com/{organization}");
+            var personalAccessTokenAuth = new VssBasicCredential(string.Empty, personalAccessToken);
+
+            using (var workItemTrackingHttpClient = new WorkItemTrackingHttpClient(uri, personalAccessTokenAuth))
+            {
+                httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+                httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", Convert.ToBase64String(System.Text.Encoding.ASCII.GetBytes($":{personalAccessToken}")));
+
+                // WIQL query to get all work items for a project
+                var wiql = new Wiql()
+                {
+                    Query = $"Select [Id], [Title], [State], [Assigned To], [Area Path] From WorkItems Where [System.TeamProject] = '{project}'"
+                };
+
+                var result = await workItemTrackingHttpClient.QueryByWiqlAsync(wiql).ConfigureAwait(false);
+
+                if (result.WorkItems.Any())
+                {
+                    // Fetching details of all work items in batches
+                    var ids = result.WorkItems.Select(item => item.Id).ToArray();
+                    var workItems = await workItemTrackingHttpClient.GetWorkItemsAsync(ids, expand: WorkItemExpand.All).ConfigureAwait(false);
+
+                    return workItems;
+                }
+            }
+
+            return new List<WorkItem>();
+        }
+        public async Task<List<WorkItem>> GetMyAssignedWorkItemsAsync(string project, HttpClient httpClient, string organization, string personalAccessToken, string userIdentifier)
+        {
+            var uri = new Uri($"https://dev.azure.com/{organization}");
+            var personalAccessTokenAuth = new VssBasicCredential(string.Empty, personalAccessToken);
+
+            using (var workItemTrackingHttpClient = new WorkItemTrackingHttpClient(uri, personalAccessTokenAuth))
+            {
+                httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+                httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", Convert.ToBase64String(System.Text.Encoding.ASCII.GetBytes($":{personalAccessToken}")));
+
+                // WIQL query to get work items assigned to the specific user
+                var wiql = new Wiql()
+                {
+                    Query = $"Select [Id], [Title], [State], [Assigned To], [Area Path] From WorkItems Where [System.TeamProject] = '{project}' AND [System.AssignedTo] = '{userIdentifier}'"
+                };
+
+                var result = await workItemTrackingHttpClient.QueryByWiqlAsync(wiql).ConfigureAwait(false);
+
+                if (result.WorkItems.Any())
+                {
+                    var ids = result.WorkItems.Select(item => item.Id).ToArray();
+                    var workItems = await workItemTrackingHttpClient.GetWorkItemsAsync(ids, expand: WorkItemExpand.All).ConfigureAwait(false);
+
+                    return workItems;
+                }
+            }
+
+            return new List<WorkItem>();
+        }
     }
 }

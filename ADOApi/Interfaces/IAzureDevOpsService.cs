@@ -20,6 +20,6 @@ namespace ADOApi.Interfaces
             string assignedUser,
             Nullable<int> priority,
             Nullable<double> remainingEffortHours,
-            Nullable<double> completedEffortHours);
+            Nullable<double> completedEffortHours, string? tag);
     }
 }

@@ -17,6 +17,7 @@ using ADOApi.Interfaces;
 using Microsoft.TeamFoundation.WorkItemTracking.WebApi.Models;
 using Microsoft.VisualStudio.Services.TestManagement.TestPlanning.WebApi;
 using WorkItem = Microsoft.TeamFoundation.WorkItemTracking.WebApi.Models.WorkItem;
+using Microsoft.TeamFoundation.Build.WebApi;
 
 namespace ADOApi.Controllers
 {
@@ -46,6 +47,31 @@ namespace ADOApi.Controllers
                 return StatusCode(500, $"Error: {ex.Message}");
             }
         }
+        [HttpGet("workitemforproject")]
+        public async Task<ActionResult<List<WorkItem>>> GetAllWorkItemsForProjectAsync(string project) {
+            try
+            {
+                List<WorkItem> workItems = await _azureDevOpsService.GetAllWorkItemsForProjectAsync(project);
+                return Ok(workItems);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Error: {ex.Message}");
+            }
+        }
+        [HttpGet("workitemsassignedtouser")]
+        public async Task<ActionResult<List<WorkItem>>> GetMyAssignedWorkItemsAsync(string project, string UserIdentifier)
+        {
+            try
+            {
+                List<WorkItem> workItems = await _azureDevOpsService.GetMyAssignedWorkItemsAsync(project, UserIdentifier);
+                return Ok(workItems);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Error: {ex.Message}");
+            }
+        }        
         [HttpGet("workitemsbytype")]
         public async Task<ActionResult<List<WorkItem>>> GetWorkItemsByType(string project, string workItemtype)
         {
@@ -102,7 +128,7 @@ namespace ADOApi.Controllers
              model.AssignedTo,
              model.Priority,
              model.RemainingEffortHours,
-             model.CompletedEffortHours);
+             model.CompletedEffortHours, model.Tag);
             if (success)
             {
                 return Ok("Work item updated successfully.");

@@ -129,7 +129,6 @@ namespace ADOApi.Services
                 throw new AzureDevOpsApiException($"Failed to create work item: {ex.Message}", ex);
             }
         }
-
         public async Task<bool> UpdateWorkItemAsync(
             int workItemId,
             string state,
@@ -140,7 +139,7 @@ namespace ADOApi.Services
             Nullable<double> completedEffortHours,
             HttpClient httpClient,
             string organization,
-            string personalAccessToken)
+            string personalAccessToken, string tag)
         {
             try
             {
@@ -209,7 +208,15 @@ namespace ADOApi.Services
                         Value = completedEffortHours
                     });
                 }
-
+                if (!string.IsNullOrEmpty(tag))
+                {
+                    patchDocument.Add(new JsonPatchOperation
+                    {
+                        Operation = Operation.Add,
+                        Path = "/fields/System.Tags",
+                        Value = tag
+                    });
+                }
                 WorkItem result = await witClient.UpdateWorkItemAsync(patchDocument, workItemId);
                 return result != null;
             }
