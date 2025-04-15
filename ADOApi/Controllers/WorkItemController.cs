@@ -290,6 +290,67 @@ namespace ADOApi.Controllers
                 return StatusCode(500, new { error = "Failed to delete template", details = ex.Message });
             }
         }
+
+        // Work Item Relations Endpoints
+        [HttpPost("{workItemId}/relations")]
+        public async Task<ActionResult<bool>> AddWorkItemRelation(int workItemId, [FromBody] WorkItemRelationRequest relation)
+        {
+            try
+            {
+                var result = await _azureDevOpsService.AddWorkItemRelationAsync(workItemId, relation);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error adding work item relation");
+                return StatusCode(500, new { error = "Failed to add relation", details = ex.Message });
+            }
+        }
+
+        [HttpDelete("{workItemId}/relations/{targetWorkItemId}")]
+        public async Task<ActionResult<bool>> RemoveWorkItemRelation(int workItemId, int targetWorkItemId, [FromQuery] string relationType)
+        {
+            try
+            {
+                var result = await _azureDevOpsService.RemoveWorkItemRelationAsync(workItemId, targetWorkItemId, relationType);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error removing work item relation");
+                return StatusCode(500, new { error = "Failed to remove relation", details = ex.Message });
+            }
+        }
+
+        [HttpGet("{workItemId}/relations")]
+        public async Task<ActionResult<List<WorkItemRelationResponse>>> GetWorkItemRelations(int workItemId)
+        {
+            try
+            {
+                var relations = await _azureDevOpsService.GetWorkItemRelationsAsync(workItemId);
+                return Ok(relations);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving work item relations");
+                return StatusCode(500, new { error = "Failed to retrieve relations", details = ex.Message });
+            }
+        }
+
+        [HttpGet("{workItemId}/related")]
+        public async Task<ActionResult<List<WorkItem>>> GetRelatedWorkItems(int workItemId, [FromQuery] string relationType)
+        {
+            try
+            {
+                var relatedWorkItems = await _azureDevOpsService.GetRelatedWorkItemsAsync(workItemId, relationType);
+                return Ok(relatedWorkItems);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving related work items");
+                return StatusCode(500, new { error = "Failed to retrieve related work items", details = ex.Message });
+            }
+        }
     }
 
     public class WorkItemUpdateRequest

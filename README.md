@@ -12,12 +12,18 @@ The AzureDevOpsService API is a .NET 8.0-based REST API designed to interact wit
   - Swashbuckle.AspNetCore (6.5.0)
   - Serilog (3.1.1)
   - Microsoft.IdentityModel.JsonWebTokens (7.5.0)
+  - Polly (8.2.1) - For retry policies and resilience
+  - Microsoft.AspNetCore.Mvc.NewtonsoftJson (8.0.0) - For JSON handling
 
 ## Features
 - **Work Item Management**
   - Create, read, update, and delete work items
   - Query work items by type
   - Manage work item relationships
+  - Work item templates support
+    - Create and manage work item templates
+    - Create work items from templates
+    - List and delete templates
 - **Project Management**
   - List all projects in the organization
   - Retrieve project details
@@ -29,6 +35,10 @@ The AzureDevOpsService API is a .NET 8.0-based REST API designed to interact wit
   - Personal Access Token (PAT) management
   - Admin token support for elevated operations
   - Secure token handling and validation
+- **Resilience & Error Handling**
+  - Retry policies for transient failures
+  - Comprehensive error handling
+  - Detailed logging with Serilog
 
 ## Configuration
 1. Update the `appsettings.json` with your Azure DevOps configuration:
@@ -92,9 +102,13 @@ Contributions to the AzureDevOpsService API are welcome. Please follow these ste
 
 ## Development Status
 - The project is under active development
+- Recent improvements:
+  - Added work item template support
+  - Implemented retry policies with Polly
+  - Enhanced error handling and logging
+  - Updated package dependencies
 - Planned improvements:
   - Refactoring of project configuration
-  - Enhanced error handling
   - Additional API endpoints
   - Performance optimizations
 

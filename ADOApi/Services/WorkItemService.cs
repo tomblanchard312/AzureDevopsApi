@@ -338,5 +338,145 @@ namespace ADOApi.Services
                 throw;
             }
         }
+
+        // Work Item Relations Implementation
+        public async Task<bool> AddWorkItemRelationAsync(int workItemId, WorkItemRelationRequest relation)
+        {
+            try
+            {
+                var patchDocument = new JsonPatchDocument();
+                patchDocument.Add(
+                    new JsonPatchOperation
+                    {
+                        Operation = Operation.Add,
+                        Path = "/relations/-",
+                        Value = new
+                        {
+                            rel = relation.RelationType,
+                            url = $"https://dev.azure.com/{_workItemTrackingHttpClient.BaseAddress.Host}/_apis/wit/workItems/{relation.TargetWorkItemId}",
+                            attributes = new Dictionary<string, object>
+                            {
+                                { "comment", relation.Comment ?? string.Empty }
+                            }
+                        }
+                    });
+
+                var workItem = await _workItemTrackingHttpClient.UpdateWorkItemAsync(patchDocument, workItemId);
+                return workItem != null;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to add work item relation");
+                throw new AzureDevOpsApiException("Failed to add work item relation", ex);
+            }
+        }
+
+        public async Task<bool> RemoveWorkItemRelationAsync(int workItemId, int targetWorkItemId, string relationType)
+        {
+            try
+            {
+                var workItem = await _workItemTrackingHttpClient.GetWorkItemAsync(workItemId, expand: WorkItemExpand.Relations);
+                if (workItem?.Relations == null)
+                {
+                    return false;
+                }
+
+                var relationToRemove = workItem.Relations.FirstOrDefault(r => 
+                    r.Rel == relationType && 
+                    r.Url.EndsWith($"/{targetWorkItemId}"));
+
+                if (relationToRemove == null)
+                {
+                    return false;
+                }
+
+                var patchDocument = new JsonPatchDocument();
+                patchDocument.Add(
+                    new JsonPatchOperation()
+                    {
+                        Operation = Operation.Remove,
+                        Path = $"/relations/{workItem.Relations.IndexOf(relationToRemove)}"
+                    }
+                );
+
+                var result = await _workItemTrackingHttpClient.UpdateWorkItemAsync(patchDocument, workItemId);
+                return result != null;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to remove work item relation");
+                throw;
+            }
+        }
+
+        public async Task<List<WorkItemRelationResponse>> GetWorkItemRelationsAsync(int workItemId)
+        {
+            try
+            {
+                var workItem = await _workItemTrackingHttpClient.GetWorkItemAsync(workItemId, expand: WorkItemExpand.Relations);
+                if (workItem?.Relations == null)
+                {
+                    return new List<WorkItemRelationResponse>();
+                }
+
+                return workItem.Relations.Select(r => new WorkItemRelationResponse
+                {
+                    RelationType = r.Rel,
+                    SourceWorkItemId = workItemId,
+                    TargetWorkItemId = int.Parse(r.Url.Split('/').Last()),
+                    Comment = r.Attributes?["comment"]?.ToString(),
+                    CreatedDate = r.Attributes?["createdDate"] != null ? 
+                        DateTime.Parse(r.Attributes["createdDate"].ToString()) : DateTime.MinValue,
+                    CreatedBy = r.Attributes?["createdBy"]?.ToString() ?? string.Empty
+                }).ToList();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to get work item relations");
+                throw;
+            }
+        }
+
+        public async Task<List<WorkItem>> GetRelatedWorkItemsAsync(int workItemId, string relationType)
+        {
+            try
+            {
+                var workItem = await _workItemTrackingHttpClient.GetWorkItemAsync(workItemId, expand: WorkItemExpand.Relations);
+                if (workItem?.Relations == null)
+                {
+                    return new List<WorkItem>();
+                }
+
+                var relatedWorkItemIds = workItem.Relations
+                    .Where(r => r.Rel == relationType)
+                    .Select(r => int.Parse(r.Url.Split('/').Last()))
+                    .ToList();
+
+                if (!relatedWorkItemIds.Any())
+                {
+                    return new List<WorkItem>();
+                }
+
+                return await _workItemTrackingHttpClient.GetWorkItemsAsync(relatedWorkItemIds);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to get related work items");
+                throw;
+            }
+        }
+
+        public async Task<WorkItem> UpdateWorkItemAsync(JsonPatchDocument patchDocument, int workItemId)
+        {
+            try
+            {
+                return await _workItemTrackingHttpClient.UpdateWorkItemAsync(patchDocument, workItemId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to update work item");
+                throw new AzureDevOpsApiException("Failed to update work item", ex);
+            }
+        }
     }
 }

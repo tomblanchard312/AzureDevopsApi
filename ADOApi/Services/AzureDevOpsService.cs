@@ -31,6 +31,7 @@ namespace ADOApi.Services
         private readonly IWorkItemService _workItemService;
         private readonly ILogger<AzureDevOpsService> _logger;
         private readonly ProjectHttpClient _projectClient;
+        private readonly WorkItemTrackingHttpClient _workItemTrackingHttpClient;
 
         public AzureDevOpsService(
             IWorkItemService workItemService,
@@ -40,6 +41,7 @@ namespace ADOApi.Services
             _workItemService = workItemService;
             _logger = logger;
             _projectClient = connection.GetClient<ProjectHttpClient>();
+            _workItemTrackingHttpClient = connection.GetClient<WorkItemTrackingHttpClient>();
         }
 
         public async Task<List<string>> GetProjectsAsync()
@@ -406,6 +408,74 @@ namespace ADOApi.Services
             catch (Exception ex)
             {
                 throw new AzureDevOpsApiException("Failed to retrieve work item", ex);
+            }
+        }
+
+        // Work Item Relations
+        public async Task<bool> AddWorkItemRelationAsync(int workItemId, WorkItemRelationRequest relation)
+        {
+            try
+            {
+                var patchDocument = new JsonPatchDocument();
+                patchDocument.Add(
+                    new JsonPatchOperation
+                    {
+                        Operation = Operation.Add,
+                        Path = "/relations/-",
+                        Value = new
+                        {
+                            rel = relation.RelationType,
+                            url = $"{_workItemTrackingHttpClient.BaseAddress}/_apis/wit/workItems/{relation.TargetWorkItemId}",
+                            attributes = new Dictionary<string, object>
+                            {
+                                { "comment", relation.Comment ?? string.Empty }
+                            }
+                        }
+                    });
+
+                var workItem = await _workItemService.UpdateWorkItemAsync(patchDocument, workItemId);
+                return workItem != null;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to add work item relation");
+                throw new AzureDevOpsApiException("Failed to add work item relation", ex);
+            }
+        }
+
+        public async Task<bool> RemoveWorkItemRelationAsync(int workItemId, int targetWorkItemId, string relationType)
+        {
+            try
+            {
+                return await _workItemService.RemoveWorkItemRelationAsync(workItemId, targetWorkItemId, relationType);
+            }
+            catch (Exception ex)
+            {
+                throw new AzureDevOpsApiException("Failed to remove work item relation", ex);
+            }
+        }
+
+        public async Task<List<WorkItemRelationResponse>> GetWorkItemRelationsAsync(int workItemId)
+        {
+            try
+            {
+                return await _workItemService.GetWorkItemRelationsAsync(workItemId);
+            }
+            catch (Exception ex)
+            {
+                throw new AzureDevOpsApiException("Failed to get work item relations", ex);
+            }
+        }
+
+        public async Task<List<WorkItem>> GetRelatedWorkItemsAsync(int workItemId, string relationType)
+        {
+            try
+            {
+                return await _workItemService.GetRelatedWorkItemsAsync(workItemId, relationType);
+            }
+            catch (Exception ex)
+            {
+                throw new AzureDevOpsApiException("Failed to get related work items", ex);
             }
         }
     }

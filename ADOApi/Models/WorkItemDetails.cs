@@ -19,7 +19,7 @@
         public Dictionary<string, object>? Fields { get; set; }
 
         [JsonProperty("relations")]
-        public List<WorkItemRelation>? Relations { get; set; }
+        public List<WorkItemApiRelation>? Relations { get; set; }
 
         [JsonProperty("_links")]
         public WorkItemLinks? Links { get; set; }
@@ -63,7 +63,7 @@
         public string? WorkItemUrl { get; internal set; }
     }
 
-    public class WorkItemRelation
+    public class WorkItemApiRelation
     {
         [JsonProperty("rel")]
         public string? Rel { get; set; }
