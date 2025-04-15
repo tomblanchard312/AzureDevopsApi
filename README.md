@@ -1,222 +1,106 @@
-# AzureDevOpsService API
+# Azure DevOps API
 
-## Overview
-The AzureDevOpsService API is a .NET 8.0-based REST API designed to interact with Azure DevOps services. It provides a comprehensive interface for managing work items, iterations, and projects within an Azure DevOps organization. The API is built with modern .NET practices and includes features like API versioning, Swagger documentation, and dependency injection.
-
-## Technical Stack
-- **Framework**: .NET 8.0
-- **Architecture**: REST API with MVC pattern
-- **Key Dependencies**:
-  - Microsoft.AspNetCore.Mvc.Versioning (5.1.0)
-  - Microsoft.TeamFoundationServer.Client (19.225.1)
-  - Swashbuckle.AspNetCore (6.5.0)
-  - Serilog (3.1.1)
-  - Microsoft.IdentityModel.JsonWebTokens (7.5.0)
-  - Polly (8.2.1) - For retry policies and resilience
-  - Microsoft.AspNetCore.Mvc.NewtonsoftJson (8.0.0) - For JSON handling
+A .NET 8.0 API for interacting with Azure DevOps, featuring AI-powered work item analysis through Semantic Kernel integration.
 
 ## Features
+
 - **Work Item Management**
   - Create, read, update, and delete work items
-  - Query work items by type
-  - Manage work item relationships
-  - Work item templates support
-    - Create and manage work item templates
-    - Create work items from templates
-    - List and delete templates
-- **Project Management**
-  - List all projects in the organization
-  - Retrieve project details
-  - Manage project configurations
-- **Iteration Management**
-  - List iterations within a project
-  - Create and manage iterations
-- **Authentication & Authorization**
-  - Personal Access Token (PAT) management
-  - Admin token support for elevated operations
-  - Secure token handling and validation
-- **Resilience & Error Handling**
-  - Retry policies for transient failures
-  - Comprehensive error handling
-  - Detailed logging with Serilog
+  - Query work items using WIQL
+  - Manage work item relations and templates
+  - Filter and search work items
+
+- **Repository Operations**
+  - Browse repository contents
+  - View file contents
+  - Manage branches
+  - Track changes
+
+- **AI Integration**
+  - Semantic Kernel integration for intelligent work item analysis
+  - Azure OpenAI integration for natural language processing
+  - AI-powered work item recommendations
+
+- **Authentication & Security**
+  - Azure DevOps PAT authentication
+  - Secure API endpoints
+  - Rate limiting and error handling
+
+## Prerequisites
+
+- .NET 8.0 SDK
+- Azure DevOps account with appropriate permissions
+- Azure OpenAI service (for AI features)
 
 ## Configuration
-1. Update the `appsettings.json` with your Azure DevOps configuration:
+
+Create an `appsettings.json` file with the following structure:
+
 ```json
 {
   "AzureDevOps": {
-    "Organization": "[Your Org]",
-    "PersonalAccessToken": "[Your PAT]",
-    "AdminPat": "[Admin Pat]",
-    "Project": "[Your Project]"
+    "OrganizationUrl": "https://dev.azure.com/your-organization",
+    "PersonalAccessToken": "your-pat"
+  },
+  "OpenAI": {
+    "DeploymentName": "your-deployment-name",
+    "Endpoint": "https://your-openai-endpoint.openai.azure.com/",
+    "ApiKey": "your-api-key"
   }
 }
 ```
 
-2. Required Permissions:
-   - Admin Token: Required for PAT management and elevated operations
-   - Personal Access Token: Needs permissions for work item read/write operations
+## Getting Started
 
-## API Documentation
-The API includes Swagger documentation, accessible at:
-- Swagger UI: `{baseUrl}/swagger`
-- Swagger JSON: `{baseUrl}/swagger/v1/swagger.json`
-
-## API Versioning
-The API supports versioning through URL segments:
-- Default version: v1.0
-- Version format: `{version}/api/{controller}/{action}/{id?}`
-- Example: `/v1.0/api/workitems/get/123`
-
-## Development Setup
 1. Clone the repository
-2. Restore NuGet packages
-3. Update configuration in `appsettings.json`
-4. Run the application:
+2. Configure your `appsettings.json`
+3. Run the application:
    ```bash
    dotnet run --project ADOApi
    ```
 
-## Project Structure
-```
-ADOApi/
-├── Controllers/     # API endpoints
-├── Models/         # Data models
-├── Services/       # Business logic
-├── Interfaces/     # Service contracts
-├── Utilities/      # Helper functions
-├── Exceptions/     # Custom exception handling
-└── Properties/     # Application properties
-```
+## API Endpoints
 
-## Security Considerations
-- All tokens and sensitive information should be stored securely
-- Use environment variables or secure configuration management in production
-- Implement proper access controls and authentication mechanisms
+### Work Items
+- `GET /api/workitem/workitemtypes` - Get available work item types
+- `GET /api/workitem/workitemforproject` - Get all work items for a project
+- `POST /api/workitem` - Create a new work item
+- `PUT /api/workitem/{id}` - Update a work item
+- `GET /api/workitem/{id}` - Get a specific work item
+- `POST /api/workitem/filter` - Filter work items
+
+### Repository
+- `GET /api/repository/contents` - Get repository contents
+- `GET /api/repository/file` - Get file content
+- `GET /api/repository/branches` - List branches
+- `POST /api/repository/branches` - Create a new branch
+
+### AI Features
+- `POST /api/semantic-kernel/ask` - Query work items using natural language
+- `POST /api/semantic-kernel/query` - Advanced work item analysis
+
+## Development
+
+### Project Structure
+- `ADOApi/` - Main API project
+- `ADOApi.UI/` - Blazor WebAssembly frontend
+- `ADOApi.Tests/` - Unit and integration tests
+
+### Dependencies
+- Microsoft.TeamFoundationServer.ExtendedClient
+- Microsoft.SemanticKernel
+- Microsoft.SemanticKernel.Connectors.OpenAI
+- Azure.AI.OpenAI
 
 ## Contributing
-Contributions to the AzureDevOpsService API are welcome. Please follow these steps:
+
 1. Fork the repository
 2. Create a feature branch
-3. Submit a pull request with a clear description of changes
-
-## Development Status
-- The project is under active development
-- Recent improvements:
-  - Added work item template support
-  - Implemented retry policies with Polly
-  - Enhanced error handling and logging
-  - Updated package dependencies
-- Planned improvements:
-  - Refactoring of project configuration
-  - Additional API endpoints
-  - Performance optimizations
-
-## Support
-For questions or issues:
-- Open an issue in the repository
-- Contact the maintainers through the project's issue tracker
+3. Commit your changes
+4. Push to the branch
+5. Create a Pull Request
 
 ## License
-This project is licensed under the terms specified in the LICENSE.txt file.
 
-## UI Development Setup
-The project includes support for generating a TypeScript client and UI using NSwag. To set up the UI:
-
-1. Install the required tools:
-   ```bash
-   dotnet tool install -g NSwag.ConsoleCore
-   ```
-
-2. Create a new Angular project (if not already created):
-   ```bash
-   ng new ClientApp
-   cd ClientApp
-   npm install
-   ```
-
-3. Generate the TypeScript client:
-   ```bash
-   nswag run nswag.json
-   ```
-
-4. Configure the API base URL in your Angular environment:
-   ```typescript
-   // src/environments/environment.ts
-   export const environment = {
-     production: false,
-     apiBaseUrl: 'http://localhost:5000'
-   };
-   ```
-
-5. Create a service to use the generated client:
-   ```typescript
-   // src/app/services/api.service.ts
-   import { Injectable } from '@angular/core';
-   import { environment } from '../../environments/environment';
-   import { WorkItemClient } from './api-client';
-
-   @Injectable({
-     providedIn: 'root'
-   })
-   export class ApiService {
-     private workItemClient: WorkItemClient;
-
-     constructor() {
-       this.workItemClient = new WorkItemClient(environment.apiBaseUrl);
-     }
-
-     // Add methods to interact with the API
-     async getWorkItems(project: string) {
-       return await this.workItemClient.getAllWorkItemsForProject(project);
-     }
-   }
-   ```
-
-6. Create components to display the data:
-   ```typescript
-   // src/app/components/work-item-list/work-item-list.component.ts
-   import { Component, OnInit } from '@angular/core';
-   import { ApiService } from '../../services/api.service';
-
-   @Component({
-     selector: 'app-work-item-list',
-     template: `
-       <div *ngFor="let item of workItems">
-         <h3>{{item.title}}</h3>
-         <p>{{item.description}}</p>
-       </div>
-     `
-   })
-   export class WorkItemListComponent implements OnInit {
-     workItems: any[] = [];
-
-     constructor(private apiService: ApiService) {}
-
-     async ngOnInit() {
-       this.workItems = await this.apiService.getWorkItems('your-project');
-     }
-   }
-   ```
-
-7. Add the component to your app module:
-   ```typescript
-   // src/app/app.module.ts
-   import { WorkItemListComponent } from './components/work-item-list/work-item-list.component';
-
-   @NgModule({
-     declarations: [
-       AppComponent,
-       WorkItemListComponent
-     ],
-     // ...
-   })
-   ```
-
-8. Run the Angular development server:
-   ```bash
-   ng serve
-   ```
-
-The UI will be available at `http://localhost:4200`.
+This project is licensed under the MIT License - see the LICENSE file for details.
 
