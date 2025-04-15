@@ -18,6 +18,9 @@ using Microsoft.TeamFoundation.WorkItemTracking.WebApi;
 using Microsoft.TeamFoundation.Core.WebApi;
 using Microsoft.TeamFoundation.SourceControl.WebApi;
 using Microsoft.VisualStudio.Services.Common;
+using Microsoft.SemanticKernel;
+using Microsoft.SemanticKernel.Connectors.OpenAI;
+using Azure.AI.OpenAI;
 using IAuthService = ADOApi.Interfaces.IAuthenticationService;
 using AuthService = ADOApi.Services.AuthenticationService;
 
@@ -61,6 +64,20 @@ namespace ADOApi
 
             // Add controllers
             services.AddControllers();
+
+            // Configure Semantic Kernel
+            services.AddSingleton(sp =>
+            {
+                var config = sp.GetRequiredService<IConfiguration>();
+                var kernelBuilder = Kernel.CreateBuilder()
+                    .AddAzureOpenAIChatCompletion(
+                        deploymentName: config["OpenAI:DeploymentName"] ?? throw new InvalidOperationException("OpenAI:DeploymentName not configured"),
+                        endpoint: config["OpenAI:Endpoint"] ?? throw new InvalidOperationException("OpenAI:Endpoint not configured"),
+                        apiKey: config["OpenAI:ApiKey"] ?? throw new InvalidOperationException("OpenAI:ApiKey not configured")
+                    );
+                
+                return kernelBuilder.Build();
+            });
 
             // Add API versioning
             services.AddApiVersioning(options =>
@@ -106,6 +123,7 @@ namespace ADOApi
             services.AddScoped<IQueryService, QueryService>();
             services.AddScoped<ICachingService, CachingService>();
             services.AddScoped<IWebhookService, WebhookService>();
+            services.AddScoped<IRepositoryService, RepositoryService>();
 
             // Add Swagger
             services.AddSwaggerGen(c =>

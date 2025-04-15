@@ -120,3 +120,103 @@ For questions or issues:
 ## License
 This project is licensed under the terms specified in the LICENSE.txt file.
 
+## UI Development Setup
+The project includes support for generating a TypeScript client and UI using NSwag. To set up the UI:
+
+1. Install the required tools:
+   ```bash
+   dotnet tool install -g NSwag.ConsoleCore
+   ```
+
+2. Create a new Angular project (if not already created):
+   ```bash
+   ng new ClientApp
+   cd ClientApp
+   npm install
+   ```
+
+3. Generate the TypeScript client:
+   ```bash
+   nswag run nswag.json
+   ```
+
+4. Configure the API base URL in your Angular environment:
+   ```typescript
+   // src/environments/environment.ts
+   export const environment = {
+     production: false,
+     apiBaseUrl: 'http://localhost:5000'
+   };
+   ```
+
+5. Create a service to use the generated client:
+   ```typescript
+   // src/app/services/api.service.ts
+   import { Injectable } from '@angular/core';
+   import { environment } from '../../environments/environment';
+   import { WorkItemClient } from './api-client';
+
+   @Injectable({
+     providedIn: 'root'
+   })
+   export class ApiService {
+     private workItemClient: WorkItemClient;
+
+     constructor() {
+       this.workItemClient = new WorkItemClient(environment.apiBaseUrl);
+     }
+
+     // Add methods to interact with the API
+     async getWorkItems(project: string) {
+       return await this.workItemClient.getAllWorkItemsForProject(project);
+     }
+   }
+   ```
+
+6. Create components to display the data:
+   ```typescript
+   // src/app/components/work-item-list/work-item-list.component.ts
+   import { Component, OnInit } from '@angular/core';
+   import { ApiService } from '../../services/api.service';
+
+   @Component({
+     selector: 'app-work-item-list',
+     template: `
+       <div *ngFor="let item of workItems">
+         <h3>{{item.title}}</h3>
+         <p>{{item.description}}</p>
+       </div>
+     `
+   })
+   export class WorkItemListComponent implements OnInit {
+     workItems: any[] = [];
+
+     constructor(private apiService: ApiService) {}
+
+     async ngOnInit() {
+       this.workItems = await this.apiService.getWorkItems('your-project');
+     }
+   }
+   ```
+
+7. Add the component to your app module:
+   ```typescript
+   // src/app/app.module.ts
+   import { WorkItemListComponent } from './components/work-item-list/work-item-list.component';
+
+   @NgModule({
+     declarations: [
+       AppComponent,
+       WorkItemListComponent
+     ],
+     // ...
+   })
+   ```
+
+8. Run the Angular development server:
+   ```bash
+   ng serve
+   ```
+
+The UI will be available at `http://localhost:4200`.
+

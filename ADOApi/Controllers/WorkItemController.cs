@@ -6,6 +6,7 @@ using Polly;
 using Polly.Retry;
 using ADOApi.Models;
 using ADOApi.Services;
+using ADOApi.Interfaces;
 using Microsoft.TeamFoundation.WorkItemTracking.WebApi.Models;
 using ADOApi.Exceptions;
 
@@ -16,11 +17,11 @@ namespace ADOApi.Controllers
     [Route("api/[controller]")]
     public class WorkItemController : ControllerBase
     {
-        private readonly AzureDevOpsService _azureDevOpsService;
+        private readonly IAzureDevOpsService _azureDevOpsService;
         private readonly ILogger<WorkItemController> _logger;
         private readonly AsyncRetryPolicy _retryPolicy;
 
-        public WorkItemController(AzureDevOpsService azureDevOpsService, ILogger<WorkItemController> logger)
+        public WorkItemController(IAzureDevOpsService azureDevOpsService, ILogger<WorkItemController> logger)
         {
             _azureDevOpsService = azureDevOpsService;
             _logger = logger;
@@ -349,6 +350,28 @@ namespace ADOApi.Controllers
             {
                 _logger.LogError(ex, "Error retrieving related work items");
                 return StatusCode(500, new { error = "Failed to retrieve related work items", details = ex.Message });
+            }
+        }
+
+        [HttpPost("filter")]
+        public async Task<ActionResult<List<WorkItem>>> GetFilteredWorkItems([FromBody] WorkItemFilterRequest filter)
+        {
+            if (string.IsNullOrEmpty(filter.Project))
+            {
+                return BadRequest("Project is required");
+            }
+
+            try
+            {
+                var workItems = await _retryPolicy.ExecuteAsync(async () =>
+                    await _azureDevOpsService.GetFilteredWorkItemsAsync(filter));
+                
+                return Ok(workItems);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error filtering work items");
+                return StatusCode(500, new { error = "Failed to filter work items", details = ex.Message });
             }
         }
     }

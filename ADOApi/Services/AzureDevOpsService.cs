@@ -23,6 +23,9 @@ using System.Collections.Generic;
 using Microsoft.Extensions.Logging;
 using ADOApi.Exceptions;
 using Microsoft.TeamFoundation.Core.WebApi;
+using System.Threading.Tasks;
+using Polly;
+using Polly.Retry;
 
 namespace ADOApi.Services
 {
@@ -32,6 +35,7 @@ namespace ADOApi.Services
         private readonly ILogger<AzureDevOpsService> _logger;
         private readonly ProjectHttpClient _projectClient;
         private readonly WorkItemTrackingHttpClient _workItemTrackingHttpClient;
+        private readonly AsyncRetryPolicy _retryPolicy;
 
         public AzureDevOpsService(
             IWorkItemService workItemService,
@@ -42,6 +46,18 @@ namespace ADOApi.Services
             _logger = logger;
             _projectClient = connection.GetClient<ProjectHttpClient>();
             _workItemTrackingHttpClient = connection.GetClient<WorkItemTrackingHttpClient>();
+            
+            // Configure retry policy
+            _retryPolicy = Polly.Policy
+                .Handle<Exception>()
+                .WaitAndRetryAsync(3, retryAttempt => 
+                    TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)),
+                    onRetry: (exception, timeSpan, retryCount, context) =>
+                    {
+                        _logger.LogWarning(exception, 
+                            "Retry {RetryCount} after {Delay}ms due to: {Message}", 
+                            retryCount, timeSpan.TotalMilliseconds, exception.Message);
+                    });
         }
 
         public async Task<List<string>> GetProjectsAsync()
@@ -477,6 +493,110 @@ namespace ADOApi.Services
             {
                 throw new AzureDevOpsApiException("Failed to get related work items", ex);
             }
+        }
+
+        public async Task<List<WorkItem>> GetFilteredWorkItemsAsync(WorkItemFilterRequest filter)
+        {
+            try
+            {
+                var wiql = BuildWiqlQuery(filter);
+                var query = new Wiql { Query = wiql };
+                
+                var queryResult = await _retryPolicy.ExecuteAsync(async () =>
+                    await _workItemTrackingHttpClient.QueryByWiqlAsync(query, filter.Project));
+
+                if (queryResult.WorkItems == null || !queryResult.WorkItems.Any())
+                    return new List<WorkItem>();
+
+                var workItemIds = queryResult.WorkItems.Select(wi => wi.Id).ToArray();
+                var workItems = await _retryPolicy.ExecuteAsync(async () =>
+                    await _workItemTrackingHttpClient.GetWorkItemsAsync(workItemIds));
+
+                return workItems.Select(wi => new WorkItem
+                {
+                    Id = wi.Id,
+                    Fields = new Dictionary<string, object>
+                    {
+                        ["System.Title"] = wi.Fields["System.Title"]?.ToString() ?? string.Empty,
+                        ["System.WorkItemType"] = wi.Fields["System.WorkItemType"]?.ToString() ?? string.Empty,
+                        ["System.State"] = wi.Fields["System.State"]?.ToString() ?? string.Empty,
+                        ["System.AssignedTo"] = wi.Fields["System.AssignedTo"]?.ToString() ?? string.Empty,
+                        ["System.CreatedDate"] = wi.Fields["System.CreatedDate"] ?? DateTime.MinValue,
+                        ["System.ChangedDate"] = wi.Fields["System.ChangedDate"] ?? DateTime.MinValue,
+                        ["Microsoft.VSTS.Common.Priority"] = wi.Fields["Microsoft.VSTS.Common.Priority"] ?? 0,
+                        ["Microsoft.VSTS.Scheduling.Effort"] = wi.Fields["Microsoft.VSTS.Scheduling.Effort"] ?? 0.0
+                    }
+                }).ToList();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error filtering work items");
+                throw new AzureDevOpsApiException("Failed to filter work items", ex);
+            }
+        }
+
+        private string BuildWiqlQuery(WorkItemFilterRequest filter)
+        {
+            var conditions = new List<string>();
+            
+            // Required project condition
+            conditions.Add($"[System.TeamProject] = '{filter.Project}'");
+
+            // Work item types
+            if (filter.WorkItemTypes?.Any() == true)
+            {
+                var types = string.Join("', '", filter.WorkItemTypes);
+                conditions.Add($"[System.WorkItemType] IN ('{types}')");
+            }
+
+            // States
+            if (filter.States?.Any() == true)
+            {
+                var states = string.Join("', '", filter.States);
+                conditions.Add($"[System.State] IN ('{states}')");
+            }
+
+            // Assigned to
+            if (filter.AssignedTo?.Any() == true)
+            {
+                var users = string.Join("', '", filter.AssignedTo);
+                conditions.Add($"[System.AssignedTo] IN ('{users}')");
+            }
+
+            // Date ranges
+            if (filter.CreatedAfter.HasValue)
+                conditions.Add($"[System.CreatedDate] >= '{filter.CreatedAfter.Value:yyyy-MM-dd}'");
+            if (filter.CreatedBefore.HasValue)
+                conditions.Add($"[System.CreatedDate] <= '{filter.CreatedBefore.Value:yyyy-MM-dd}'");
+            if (filter.ChangedAfter.HasValue)
+                conditions.Add($"[System.ChangedDate] >= '{filter.ChangedAfter.Value:yyyy-MM-dd}'");
+            if (filter.ChangedBefore.HasValue)
+                conditions.Add($"[System.ChangedDate] <= '{filter.ChangedBefore.Value:yyyy-MM-dd}'");
+
+            // Tags
+            if (filter.Tags?.Any() == true)
+            {
+                var tags = string.Join("' AND [System.Tags] CONTAINS '", filter.Tags);
+                conditions.Add($"[System.Tags] CONTAINS '{tags}'");
+            }
+
+            // Title and description
+            if (!string.IsNullOrEmpty(filter.TitleContains))
+                conditions.Add($"[System.Title] CONTAINS '{filter.TitleContains}'");
+            if (!string.IsNullOrEmpty(filter.DescriptionContains))
+                conditions.Add($"[System.Description] CONTAINS '{filter.DescriptionContains}'");
+
+            // Priority
+            if (filter.Priority.HasValue)
+                conditions.Add($"[Microsoft.VSTS.Common.Priority] = {filter.Priority.Value}");
+
+            // Effort hours range
+            if (filter.EffortHoursMin.HasValue)
+                conditions.Add($"[Microsoft.VSTS.Scheduling.Effort] >= {filter.EffortHoursMin.Value}");
+            if (filter.EffortHoursMax.HasValue)
+                conditions.Add($"[Microsoft.VSTS.Scheduling.Effort] <= {filter.EffortHoursMax.Value}");
+
+            return $"SELECT [System.Id] FROM WorkItems WHERE {string.Join(" AND ", conditions)}";
         }
     }
 }

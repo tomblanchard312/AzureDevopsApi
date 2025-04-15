@@ -6,6 +6,7 @@ namespace ADOApi.Interfaces
 {
     public interface IAzureDevOpsService
     {
+        Task<List<string>> GetProjectsAsync();
         Task<List<string>> GetWorkItemTypesAsync(string project);
         Task<List<string>> GetIterationsAsync(string project);
         Task<List<WorkItem>> GetWorkItemsByTypeAsync(string project, string workItemType);
@@ -21,5 +22,17 @@ namespace ADOApi.Interfaces
             int? priority,
             double? remainingEffortHours,
             double? completedEffortHours, string? tag);
+        Task<List<WorkItem>> GetAllWorkItemsForProjectAsync(string project);
+        Task<List<WorkItem>> GetMyAssignedWorkItemsAsync(string project, string userIdentifier);
+        Task<WorkItem> GetWorkItemByIdAsync(int workItemId, string project);
+        Task<int> CreateWorkItemTemplateAsync(ADOApi.Models.WorkItemTemplate template);
+        Task<List<ADOApi.Models.WorkItemTemplate>> GetWorkItemTemplatesAsync(string project);
+        Task<int> CreateWorkItemFromTemplateAsync(int templateId, Dictionary<string, object>? overrides = null);
+        Task DeleteWorkItemTemplateAsync(int templateId);
+        Task<bool> AddWorkItemRelationAsync(int workItemId, WorkItemRelationRequest relation);
+        Task<bool> RemoveWorkItemRelationAsync(int workItemId, int targetWorkItemId, string relationType);
+        Task<List<WorkItemRelationResponse>> GetWorkItemRelationsAsync(int workItemId);
+        Task<List<WorkItem>> GetRelatedWorkItemsAsync(int workItemId, string relationType);
+        Task<List<WorkItem>> GetFilteredWorkItemsAsync(WorkItemFilterRequest filter);
     }
 }

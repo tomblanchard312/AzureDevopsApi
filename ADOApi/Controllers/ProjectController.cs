@@ -1,4 +1,5 @@
 ﻿using ADOApi.Services;
+using ADOApi.Interfaces;
 
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Versioning;
@@ -10,8 +11,8 @@ namespace ADOApi.Controllers
     [Route("api/[controller]")]
     public class ProjectController : ControllerBase
     {
-        private readonly AzureDevOpsService _azureDevOpsService;
-        public ProjectController(AzureDevOpsService azureDevOpsService)
+        private readonly IAzureDevOpsService _azureDevOpsService;
+        public ProjectController(IAzureDevOpsService azureDevOpsService)
         {
             _azureDevOpsService = azureDevOpsService;
         }
