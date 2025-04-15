@@ -1,10 +1,10 @@
-﻿using ADOApi.Models;
+﻿using System.Threading.Tasks;
 
 namespace ADOApi.Interfaces
 {
     public interface IAuthenticationService
     {
-        Task<string> CreatePersonalAccessTokenAsync(string displayName, string scope, DateTime validTo, bool allOrgs, HttpClient httpClient, string organization, string adminToken);
-        Task<List<PatResponse>> GetTokensAsync(HttpClient httpClient, string organization, string adminToken);
+        // This interface is intentionally left empty as we're not using PAT management
+        // and authentication is handled through the Azure DevOps client libraries
     }
 }

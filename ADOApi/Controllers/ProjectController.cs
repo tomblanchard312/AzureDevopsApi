@@ -1,13 +1,14 @@
 ﻿using ADOApi.Services;
 
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Versioning;
 
 namespace ADOApi.Controllers
 {
     [ApiController]
-    [ApiVersion("1.0")]
+    [Microsoft.AspNetCore.Mvc.ApiVersion("1.0")]
     [Route("api/[controller]")]
-    public class ProjectController : Controller
+    public class ProjectController : ControllerBase
     {
         private readonly AzureDevOpsService _azureDevOpsService;
         public ProjectController(AzureDevOpsService azureDevOpsService)

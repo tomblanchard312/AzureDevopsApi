@@ -1,36 +1,45 @@
-# AzureDevOpsService API
+# Azure DevOps API
 
-## Overview
-The AzureDevOpsService API is a .NET-based interface designed to interact with Azure DevOps services. It provides functionalities to manage and query work items, iterations, and projects within an Azure DevOps organization. This API is currently under development and features may be added, removed, or changed in future releases.
+A .NET Core API for interacting with Azure DevOps services.
 
 ## Configuration
-Replace the following in the Appsettings with your values:
-"AzureDevOps": {
-    "Organization": "[Your Org]",
-    "PersonalAccessToken": "[Your Pat]",
-    "AdminPat": "[Admin Pat]",
-    "Project": "[Your Project]"
-  },
+
+The application requires the following configuration settings:
+
+```json
+{
+  "AzureDevOps": {
+    "OrganizationUrl": "https://dev.azure.com/your-organization",
+    "PersonalAccessToken": "[Your PAT]"
+  }
+}
+```
+
+### Required Settings
+
+- OrganizationUrl: Your Azure DevOps organization URL
+- PersonalAccessToken: Your Azure DevOps Personal Access Token with appropriate permissions
+
+## Features
+
+- Work Item Management
+- Project Information
+- Template Management
+- Query Execution
+
+## API Endpoints
+
+The API provides various endpoints for interacting with Azure DevOps services. See the Swagger documentation for detailed endpoint information.
 
 ## Authentication
-Admin Token: To create personal access tokens through this API, an admin token with elevated permissions is required. This ensures that only authorized users can generate new tokens.
-Personal Access Token: For general operations like reading and writing work items, querying projects, and managing iterations, a personal access token with appropriate permissions to read and write work items is sufficient.
-Current Capabilities
-The API currently supports a variety of operations, including but not limited to:
 
-Retrieving work item types for a specific project.
-Fetching iterations within a project.
-Listing all projects within the organization.
-Getting work items by type.
-Creating personal access tokens (requires an admin token).
-Adding new work items to a project.
-Retrieving and updating existing work items.
+The API uses Azure DevOps Personal Access Tokens (PAT) for authentication. Ensure your PAT has the necessary permissions for the operations you need to perform.
+
+## Overview
+The AzureDevOpsService API is a .NET-based interface designed to interact with Azure DevOps services. It provides functionalities to manage and query work items, iterations, and projects within an Azure DevOps organization.
 
 ## Note
 This API is a work in progress, and the functionality is subject to change. Users are encouraged to regularly check for updates and modifications as the API evolves.
-It currently needs some cleanup and refactoring. 
-It may no longer need the project to be in app settings, as it is not retrieved from your org.
-Other various things that will be updated.
 
 ## Contributing
 

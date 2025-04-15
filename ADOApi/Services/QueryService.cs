@@ -20,29 +20,34 @@ using Newtonsoft.Json.Linq;
 using System.Net.Http.Headers;
 using Microsoft.TeamFoundation.Core.WebApi;
 using Microsoft.VisualStudio.Services.Organization.Client;
+using Microsoft.Extensions.Logging;
 
 namespace ADOApi.Services
 {
     public class QueryService : IQueryService
     {
+        private readonly WorkItemTrackingHttpClient _workItemTrackingHttpClient;
+        private readonly ILogger<QueryService> _logger;
+
+        public QueryService(WorkItemTrackingHttpClient workItemTrackingHttpClient, ILogger<QueryService> logger)
+        {
+            _workItemTrackingHttpClient = workItemTrackingHttpClient;
+            _logger = logger;
+        }
+
         public async Task<WorkItem> GetWorkItemByIdAsync(int workItemId, string project, HttpClient httpClient, string organization, string personalAccessToken)
         {
             try
             {
-                var credentials = new VssBasicCredential(string.Empty, personalAccessToken);
-                var connection = new VssConnection(new Uri($"https://dev.azure.com/{organization}"), credentials);
-                var witClient = connection.GetClient<WorkItemTrackingHttpClient>();
-
-                WorkItem workItem = await witClient.GetWorkItemAsync(workItemId, expand: WorkItemExpand.All);
-
-                return workItem;
+                return await _workItemTrackingHttpClient.GetWorkItemAsync(workItemId, expand: WorkItemExpand.All);
             }
             catch (Exception ex)
             {
-                // Log the exception or handle it as needed
-                throw new AzureDevOpsApiException($"Failed to retrieve work item with ID {workItemId}: {ex.Message}", ex);
+                _logger.LogError(ex, "Failed to get work item");
+                throw;
             }
         }
+
         public async Task<List<string>> GetWorkItemTypesAsync(string project, HttpClient httpClient, string organization, string personalAccessToken)
         {
             try
@@ -58,10 +63,14 @@ namespace ADOApi.Services
                 string responseBody = await response.Content.ReadAsStringAsync();
                 var workItemTypes = JsonSerializer.Deserialize<JsonElement>(responseBody);
 
-                List<string> workItemTypeNames = new List<string>();
+                List<string> workItemTypeNames = [];
                 foreach (var workItemType in workItemTypes.GetProperty("value").EnumerateArray())
                 {
-                    workItemTypeNames.Add(workItemType.GetProperty("name").GetString());
+                    var name = workItemType.GetProperty("name").GetString();
+                    if (!string.IsNullOrEmpty(name)) // Ensure the name is not null or empty
+                    {
+                        workItemTypeNames.Add(name);
+                    }
                 }
 
                 return workItemTypeNames;
@@ -91,7 +100,7 @@ namespace ADOApi.Services
                 Wiql query = new Wiql() { Query = wiqlQuery };
                 WorkItemQueryResult queryResult = await witClient.QueryByWiqlAsync(query, project);
 
-                List<string> iterationPaths = new List<string>();
+                List<string> iterationPaths = [];
                 foreach (var workItemReference in queryResult.WorkItems)
                 {
                     WorkItem workItem = await witClient.GetWorkItemAsync(workItemReference.Id);
@@ -102,7 +111,7 @@ namespace ADOApi.Services
                     }
                 }
 
-                List<string> iterations = iterationPaths.Distinct().ToList();
+                List<string> iterations = [.. iterationPaths.Distinct()];
                 return iterations;
             }
             catch (Exception ex)
@@ -130,10 +139,10 @@ namespace ADOApi.Services
 
                 if (queryResult == null || queryResult.WorkItems == null)
                 {
-                    return new List<WorkItem>();
+                    return [];
                 }
 
-                List<WorkItem> workItems = new List<WorkItem>();
+                List<WorkItem> workItems = [];
 
                 foreach (var workItemReference in queryResult.WorkItems)
                 {
@@ -154,23 +163,41 @@ namespace ADOApi.Services
             try
             {
                 string requestUrl = $"https://dev.azure.com/{organization}/_apis/work/accountmyworkrecentactivity?api-version=7.0";
-                httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Basic", Convert.ToBase64String(System.Text.Encoding.ASCII.GetBytes($":{personalAccessToken}")));
+                httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Basic",
+                    Convert.ToBase64String(System.Text.Encoding.ASCII.GetBytes($":{personalAccessToken}")));
 
-                HttpResponseMessage response = await httpClient.GetAsync(requestUrl);
+                var response = await httpClient.GetAsync(requestUrl);
                 response.EnsureSuccessStatusCode();
 
-                string responseBody = await response.Content.ReadAsStringAsync();
-                List<RecentWorkItem> recentWorkItems = DeserializeRecentWorkItems(responseBody);
+                var content = await response.Content.ReadAsStringAsync();
+                var recentItems = JsonSerializer.Deserialize<List<RecentWorkItemResponse>>(content);
 
-                return recentWorkItems;
+                if (recentItems == null)
+                {
+                    return new List<RecentWorkItem>();
+                }
+
+                return recentItems.Select(item => new RecentWorkItem
+                {
+                    Id = item.Id,
+                    Title = item.Title ?? string.Empty,
+                    State = item.State ?? string.Empty,
+                    WorkItemType = item.WorkItemType ?? string.Empty,
+                    AssignedTo = item.AssignedTo ?? string.Empty,
+                    ChangedDate = item.ChangedDate,
+                    IdentityId = item.IdentityId ?? string.Empty,
+                    ActivityDate = item.ActivityDate,
+                    ActivityType = item.ActivityType ?? string.Empty,
+                    TeamProject = item.TeamProject ?? string.Empty
+                }).ToList();
             }
             catch (Exception ex)
             {
-                // Log the exception or handle it as needed
-                throw new AzureDevOpsApiException($"Failed to retrieve recent work items: {ex.Message}", ex);
+                _logger.LogError(ex, "Failed to get recent work items");
+                throw new AzureDevOpsApiException("Failed to get recent work items", ex);
             }
         }
-        private List<RecentWorkItem> DeserializeRecentWorkItems(string json)
+        private static List<RecentWorkItem> DeserializeRecentWorkItems(string json)
         {
             try
             {
@@ -187,7 +214,7 @@ namespace ADOApi.Services
                     JsonElement valueArray = root.GetProperty("value");
 
                     // Deserialize each item in the "value" array into a RecentWorkItem object
-                    List<RecentWorkItem> recentWorkItems = new List<RecentWorkItem>();
+                    List<RecentWorkItem> recentWorkItems = [];
                     foreach (JsonElement item in valueArray.EnumerateArray())
                     {
                         RecentWorkItem recentWorkItem = DeserializeRecentWorkItem(item);
@@ -204,18 +231,33 @@ namespace ADOApi.Services
             }
         }
 
-        private RecentWorkItem DeserializeRecentWorkItem(JsonElement item)
+        private static RecentWorkItem DeserializeRecentWorkItem(JsonElement item)
         {
             try
             {
                 // Deserialize the properties of the RecentWorkItem
                 RecentWorkItem recentWorkItem = new RecentWorkItem
                 {
-                    ActivityDate = item.GetProperty("activityDate").GetString(),
+                    ActivityDate = item.GetProperty("activityDate").GetDateTime(),
                     ActivityType = item.GetProperty("activityType").GetString(),
-                    ProjectName = item.GetProperty("project").GetProperty("name").GetString(),
-                    WorkItemId = item.GetProperty("resource").GetProperty("id").GetInt32(),
-                    WorkItemType = item.GetProperty("resource").GetProperty("type").GetString(),
+                    AssignedTo = item.GetProperty("assignedTo").GetProperty("name").GetString(),
+                    ChangedDate = item.GetProperty("changedDate").GetDateTime(),
+                    IdentityId = item.TryGetProperty("identityId", out var identityIdElement) && identityIdElement.ValueKind != JsonValueKind.Null
+                        ? identityIdElement.GetString() ?? string.Empty // Ensure non-null assignment
+                        : string.Empty, // Provide a default value to avoid null assignment
+                    State = item.TryGetProperty("state", out var stateElement) && stateElement.ValueKind != JsonValueKind.Null
+                        ? stateElement.GetString() ?? string.Empty // Ensure non-null assignment
+                        : string.Empty, // Provide a default value to avoid null assignment
+                    TeamProject = item.TryGetProperty("teamProject", out var teamProjectElement) && teamProjectElement.ValueKind != JsonValueKind.Null
+                        ? teamProjectElement.GetString() ?? string.Empty // Ensure non-null assignment
+                        : string.Empty, // Provide a default value to avoid null assignment
+                    Title = item.TryGetProperty("title", out var titleElement) && titleElement.ValueKind != JsonValueKind.Null
+                        ? titleElement.GetString() ?? string.Empty // Ensure non-null assignment
+                        : string.Empty, // Provide a default value to avoid null assignment
+                    WorkItemType = item.TryGetProperty("resource", out var resourceElement) && resourceElement.ValueKind != JsonValueKind.Null &&
+                                    resourceElement.TryGetProperty("type", out var typeElement) && typeElement.ValueKind != JsonValueKind.Null
+                        ? typeElement.GetString() ?? string.Empty // Ensure non-null assignment
+                        : string.Empty, // Provide a default value to avoid null assignment
                     WorkItemTitle = item.GetProperty("resource").GetProperty("name").GetString(),
                     WorkItemUrl = item.GetProperty("resource").GetProperty("url").GetString()
                 };
@@ -229,11 +271,11 @@ namespace ADOApi.Services
             }
         }
 
-        private async Task<List<WorkItemDetails>> GetRelatedWorkItems(WorkItemTrackingHttpClient witClient, WorkItem workItem, string relationType)
+        private static async Task<List<WorkItemDetails>> GetRelatedWorkItems(WorkItemTrackingHttpClient witClient, WorkItem workItem, string relationType)
         {
             try
             {
-                List<WorkItemDetails> relatedWorkItems = new List<WorkItemDetails>();
+                List<WorkItemDetails> relatedWorkItems = [];
 
                 if (workItem.Relations != null)
                 {
@@ -242,8 +284,7 @@ namespace ADOApi.Services
                         // Check if the relation is of the desired type
                         if (relation.Rel.EndsWith(relationType, StringComparison.OrdinalIgnoreCase))
                         {
-                            int relatedWorkItemId;
-                            if (int.TryParse(relation.Url.Split('/').Last(), out relatedWorkItemId))
+                            if (int.TryParse(relation.Url.Split('/').Last(), out int relatedWorkItemId))
                             {
                                 WorkItemDetails relatedWorkItem = await GetWorkItemDetails(witClient, relatedWorkItemId);
                                 relatedWorkItems.Add(relatedWorkItem);
@@ -261,22 +302,23 @@ namespace ADOApi.Services
             }
         }
 
-        private async Task<WorkItemDetails> GetWorkItemDetails(WorkItemTrackingHttpClient witClient, int workItemId)
+        private static async Task<WorkItemDetails> GetWorkItemDetails(WorkItemTrackingHttpClient witClient, int workItemId)
         {
             try
             {
                 WorkItem workItem = await witClient.GetWorkItemAsync(workItemId);
-                string iterationPath = null;
-                if (workItem.Fields.TryGetValue("System.IterationPath", out object iterationPathObj) && iterationPathObj != null)
+                string? iterationPath = null; // Use nullable string to handle potential null values
+
+                if (workItem.Fields.TryGetValue("System.IterationPath", out object? iterationPathObj) && iterationPathObj != null)
                 {
                     iterationPath = iterationPathObj.ToString();
                 }
 
                 return new WorkItemDetails
                 {
-                    Id = (int)workItem.Id,
+                    Id = workItem.Id ?? throw new InvalidOperationException("WorkItem ID is null."),
                     Title = workItem.Fields["System.Title"]?.ToString(),
-                    IterationPath = iterationPath
+                    IterationPath = iterationPath // Assign nullable string directly
                 };
             }
             catch (Exception ex)
@@ -339,7 +381,7 @@ namespace ADOApi.Services
                 }
             }
 
-            return new List<WorkItem>();
+            return [];
         }
         public async Task<List<WorkItem>> GetMyAssignedWorkItemsAsync(string project, HttpClient httpClient, string organization, string personalAccessToken, string userIdentifier)
         {
@@ -368,7 +410,21 @@ namespace ADOApi.Services
                 }
             }
 
-            return new List<WorkItem>();
+            return [];
         }
+    }
+
+    internal class RecentWorkItemResponse
+    {
+        public int Id { get; set; }
+        public string? Title { get; set; }
+        public string? State { get; set; }
+        public string? WorkItemType { get; set; }
+        public string? AssignedTo { get; set; }
+        public DateTime ChangedDate { get; set; }
+        public string? IdentityId { get; set; }
+        public DateTime ActivityDate { get; set; }
+        public string? ActivityType { get; set; }
+        public string? TeamProject { get; set; }
     }
 }

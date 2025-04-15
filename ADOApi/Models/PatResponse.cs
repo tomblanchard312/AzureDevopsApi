@@ -2,9 +2,10 @@
 {
     public class PatResponse
     {
-        public string AccessToken { get; set; }
-        public string DisplayName { get; set; }
-        public string Scope { get; set; }
+        public required string AccessToken { get; set; }
+        public required string DisplayName { get; set; }
+        public required string Scope { get; set; }
         public DateTime ValidTo { get; set; }
+        public bool AllOrgs { get; set; }
     }
 }

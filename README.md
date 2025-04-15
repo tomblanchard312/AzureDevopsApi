@@ -1,41 +1,108 @@
 # AzureDevOpsService API
 
 ## Overview
-The AzureDevOpsService API is a .NET-based interface designed to interact with Azure DevOps services. It provides functionalities to manage and query work items, iterations, and projects within an Azure DevOps organization. This API is currently under development and features may be added, removed, or changed in future releases.
+The AzureDevOpsService API is a .NET 8.0-based REST API designed to interact with Azure DevOps services. It provides a comprehensive interface for managing work items, iterations, and projects within an Azure DevOps organization. The API is built with modern .NET practices and includes features like API versioning, Swagger documentation, and dependency injection.
+
+## Technical Stack
+- **Framework**: .NET 8.0
+- **Architecture**: REST API with MVC pattern
+- **Key Dependencies**:
+  - Microsoft.AspNetCore.Mvc.Versioning (5.1.0)
+  - Microsoft.TeamFoundationServer.Client (19.225.1)
+  - Swashbuckle.AspNetCore (6.5.0)
+  - Serilog (3.1.1)
+  - Microsoft.IdentityModel.JsonWebTokens (7.5.0)
+
+## Features
+- **Work Item Management**
+  - Create, read, update, and delete work items
+  - Query work items by type
+  - Manage work item relationships
+- **Project Management**
+  - List all projects in the organization
+  - Retrieve project details
+  - Manage project configurations
+- **Iteration Management**
+  - List iterations within a project
+  - Create and manage iterations
+- **Authentication & Authorization**
+  - Personal Access Token (PAT) management
+  - Admin token support for elevated operations
+  - Secure token handling and validation
 
 ## Configuration
-Replace the following in the Appsettings with your values:
-"AzureDevOps": {
+1. Update the `appsettings.json` with your Azure DevOps configuration:
+```json
+{
+  "AzureDevOps": {
     "Organization": "[Your Org]",
-    "PersonalAccessToken": "[Your Pat]",
+    "PersonalAccessToken": "[Your PAT]",
     "AdminPat": "[Admin Pat]",
     "Project": "[Your Project]"
-  },
+  }
+}
+```
 
-## Authentication
-Admin Token: To create personal access tokens through this API, an admin token with elevated permissions is required. This ensures that only authorized users can generate new tokens.
-Personal Access Token: For general operations like reading and writing work items, querying projects, and managing iterations, a personal access token with appropriate permissions to read and write work items is sufficient.
-Current Capabilities
-The API currently supports a variety of operations, including but not limited to:
+2. Required Permissions:
+   - Admin Token: Required for PAT management and elevated operations
+   - Personal Access Token: Needs permissions for work item read/write operations
 
-Retrieving work item types for a specific project.
-Fetching iterations within a project.
-Listing all projects within the organization.
-Getting work items by type.
-Creating personal access tokens (requires an admin token).
-Adding new work items to a project.
-Retrieving and updating existing work items.
+## API Documentation
+The API includes Swagger documentation, accessible at:
+- Swagger UI: `{baseUrl}/swagger`
+- Swagger JSON: `{baseUrl}/swagger/v1/swagger.json`
 
-## Note
-This API is a work in progress, and the functionality is subject to change. Users are encouraged to regularly check for updates and modifications as the API evolves.
-It currently needs some cleanup and refactoring. 
-It may no longer need the project to be in app settings, as it is not retrieved from your org.
-Other various things that will be updated.
+## API Versioning
+The API supports versioning through URL segments:
+- Default version: v1.0
+- Version format: `{version}/api/{controller}/{action}/{id?}`
+- Example: `/v1.0/api/workitems/get/123`
+
+## Development Setup
+1. Clone the repository
+2. Restore NuGet packages
+3. Update configuration in `appsettings.json`
+4. Run the application:
+   ```bash
+   dotnet run --project ADOApi
+   ```
+
+## Project Structure
+```
+ADOApi/
+├── Controllers/     # API endpoints
+├── Models/         # Data models
+├── Services/       # Business logic
+├── Interfaces/     # Service contracts
+├── Utilities/      # Helper functions
+├── Exceptions/     # Custom exception handling
+└── Properties/     # Application properties
+```
+
+## Security Considerations
+- All tokens and sensitive information should be stored securely
+- Use environment variables or secure configuration management in production
+- Implement proper access controls and authentication mechanisms
 
 ## Contributing
+Contributions to the AzureDevOpsService API are welcome. Please follow these steps:
+1. Fork the repository
+2. Create a feature branch
+3. Submit a pull request with a clear description of changes
 
-Contributions to the AzureDevOpsService API are welcome. If you have suggestions or improvements, please submit a pull request or open an issue in the repository.
+## Development Status
+- The project is under active development
+- Planned improvements:
+  - Refactoring of project configuration
+  - Enhanced error handling
+  - Additional API endpoints
+  - Performance optimizations
 
-## Contact
-For any questions or feedback regarding this API, please reach out to me or submit an issue in the project's issue tracker.
+## Support
+For questions or issues:
+- Open an issue in the repository
+- Contact the maintainers through the project's issue tracker
+
+## License
+This project is licensed under the terms specified in the LICENSE.txt file.
 

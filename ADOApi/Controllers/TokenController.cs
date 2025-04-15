@@ -2,6 +2,7 @@
 using ADOApi.Services;
 
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Versioning;
 
 using System;
 using System.Collections.Generic;
@@ -9,7 +10,7 @@ using System.Threading.Tasks;
 namespace ADOApi.Controllers
 {
     [ApiController]
-    [ApiVersion("1.0")]
+    [Microsoft.AspNetCore.Mvc.ApiVersion("1.0")]
     [Route("api/[controller]")]
     public class TokenController : ControllerBase
     {

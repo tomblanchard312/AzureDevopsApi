@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
@@ -16,11 +18,94 @@ using Microsoft.VisualStudio.Services.WebApi.Patch;
 using Microsoft.VisualStudio.Services.WebApi.Patch.Json;
 
 using Newtonsoft.Json;
+using Microsoft.Extensions.Logging;
+using Microsoft.TeamFoundation.Core.WebApi;
+using Microsoft.TeamFoundation.SourceControl.WebApi;
 
 namespace ADOApi.Services
 {
     public class WorkItemService : IWorkItemService
     {
+        private readonly WorkItemTrackingHttpClient _workItemTrackingHttpClient;
+        private readonly GitHttpClient _gitHttpClient;
+        private readonly ILogger<WorkItemService> _logger;
+
+        public WorkItemService(
+            WorkItemTrackingHttpClient workItemTrackingHttpClient,
+            GitHttpClient gitHttpClient,
+            ILogger<WorkItemService> logger)
+        {
+            _workItemTrackingHttpClient = workItemTrackingHttpClient;
+            _gitHttpClient = gitHttpClient;
+            _logger = logger;
+        }
+
+        public async Task<WorkItem> CreateWorkItemAsync(JsonPatchDocument patchDocument, string project, string workItemType)
+        {
+            try
+            {
+                return await _workItemTrackingHttpClient.CreateWorkItemAsync(patchDocument, project, workItemType);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to create work item");
+                throw;
+            }
+        }
+
+        public async Task<WorkItem> GetWorkItemAsync(int id, WorkItemExpand? expand = null)
+        {
+            try
+            {
+                return await _workItemTrackingHttpClient.GetWorkItemAsync(id, expand: expand);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to get work item");
+                throw;
+            }
+        }
+
+        public async Task<List<WorkItem>> GetWorkItemsAsync(IEnumerable<int> ids, WorkItemExpand? expand = null)
+        {
+            try
+            {
+                var workItems = await _workItemTrackingHttpClient.GetWorkItemsAsync(ids, expand: expand);
+                return workItems.ToList();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to get work items");
+                throw;
+            }
+        }
+
+        public async Task<WorkItemQueryResult> QueryByWiqlAsync(Wiql query, string project)
+        {
+            try
+            {
+                return await _workItemTrackingHttpClient.QueryByWiqlAsync(query, project);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to query work items");
+                throw;
+            }
+        }
+
+        public async Task DeleteWorkItemAsync(int id)
+        {
+            try
+            {
+                await _workItemTrackingHttpClient.DeleteWorkItemAsync(id);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to delete work item");
+                throw;
+            }
+        }
+
         public async Task<int> AddWorkItemAsync(string project, string workItemType, string title, string description, string assignedTo, string tag, double? effortHours, string comments, int? parentId, HttpClient httpClient, string organization, string personalAccessToken)
         {
             try
@@ -29,29 +114,28 @@ namespace ADOApi.Services
                 var connection = new VssConnection(new Uri($"https://dev.azure.com/{organization}"), credentials);
                 var witClient = connection.GetClient<WorkItemTrackingHttpClient>();
 
-                JsonPatchDocument patchDocument = new JsonPatchDocument();
-
-                // Add fields to the patch document
-                patchDocument.Add(new JsonPatchOperation
-                {
-                    Operation = Operation.Add,
-                    Path = "/fields/System.Title",
-                    Value = title
-                });
-
-                patchDocument.Add(new JsonPatchOperation
-                {
-                    Operation = Operation.Add,
-                    Path = "/fields/System.IterationPath",
-                    Value = $"{project}\\Iteration 1" // Adjust the iteration path as needed
-                });
-
-                patchDocument.Add(new JsonPatchOperation
-                {
-                    Operation = Operation.Add,
-                    Path = "/fields/System.WorkItemType",
-                    Value = workItemType
-                });
+                JsonPatchDocument patchDocument =
+                [
+                    // Add fields to the patch document
+                    new JsonPatchOperation
+                    {
+                        Operation = Operation.Add,
+                        Path = "/fields/System.Title",
+                        Value = title
+                    },
+                    new JsonPatchOperation
+                    {
+                        Operation = Operation.Add,
+                        Path = "/fields/System.IterationPath",
+                        Value = $"{project}\\Iteration 1" // Adjust the iteration path as needed
+                    },
+                    new JsonPatchOperation
+                    {
+                        Operation = Operation.Add,
+                        Path = "/fields/System.WorkItemType",
+                        Value = workItemType
+                    },
+                ];
 
                 if (!string.IsNullOrEmpty(description))
                 {
@@ -120,7 +204,7 @@ namespace ADOApi.Services
                     });
                 }
 
-                WorkItem result = await witClient.CreateWorkItemAsync(patchDocument, project, workItemType);
+                WorkItem result = await _workItemTrackingHttpClient.CreateWorkItemAsync(patchDocument, project, workItemType);
                 return result.Id ?? 0;
             }
             catch (Exception ex)
@@ -147,7 +231,7 @@ namespace ADOApi.Services
                 var connection = new VssConnection(new Uri($"https://dev.azure.com/{organization}"), credentials);
                 var witClient = connection.GetClient<WorkItemTrackingHttpClient>();
 
-                JsonPatchDocument patchDocument = new JsonPatchDocument();
+                JsonPatchDocument patchDocument = [];
 
                 if (!string.IsNullOrEmpty(state))
                 {
@@ -217,13 +301,41 @@ namespace ADOApi.Services
                         Value = tag
                     });
                 }
-                WorkItem result = await witClient.UpdateWorkItemAsync(patchDocument, workItemId);
+                WorkItem result = await _workItemTrackingHttpClient.UpdateWorkItemAsync(patchDocument, workItemId);
                 return result != null;
             }
             catch (Exception ex)
             {
                 // Log the exception or handle it as needed
                 throw new AzureDevOpsApiException($"Failed to update work item: {ex.Message}", ex);
+            }
+        }
+
+        public async Task<List<WorkItemType>> GetWorkItemTypesAsync(string project)
+        {
+            try
+            {
+                var workItemTypes = await _workItemTrackingHttpClient.GetWorkItemTypesAsync(project);
+                return workItemTypes.ToList();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to get work item types");
+                throw;
+            }
+        }
+
+        public async Task<List<GitRepository>> GetIterationsAsync(string project)
+        {
+            try
+            {
+                var repositories = await _gitHttpClient.GetRepositoriesAsync(project);
+                return repositories.ToList();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to get iterations");
+                throw;
             }
         }
     }

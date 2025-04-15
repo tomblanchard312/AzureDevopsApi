@@ -1,13 +1,23 @@
-﻿using ADOApi.Models;
+﻿using Microsoft.VisualStudio.Services.Common;
+using Microsoft.VisualStudio.Services.WebApi;
 
 namespace ADOApi.Services
 {
-    internal class AssignedTo : IdentityRef
+    public class AssignedTo : IdentityRef
     {
-        public string Id { get; set; }
-        public string Name { get; set; }
-        public string DisplayName { get; set; }
-        public string UniqueName { get; set; }
-        public string Descriptor { get; set; }
+        public new string Id { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
+        public new string DisplayName { get; set; } = string.Empty;
+        public new string UniqueName { get; set; } = string.Empty;
+        public new string Descriptor { get; set; } = string.Empty;
+
+        public AssignedTo()
+        {
+            Id = string.Empty;
+            Name = string.Empty;
+            DisplayName = string.Empty;
+            UniqueName = string.Empty;
+            Descriptor = string.Empty;
+        }
     }
 }

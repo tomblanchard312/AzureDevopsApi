@@ -1,25 +1,32 @@
 ﻿using System;
+using System.Net;
 using System.Runtime.Serialization;
 
 namespace ADOApi.Exceptions
 {
-    [Serializable]
-    internal class AzureDevOpsApiException : Exception
+    public class AzureDevOpsApiException : Exception
     {
-        public AzureDevOpsApiException()
+        public HttpStatusCode StatusCode { get; }
+        public string? ErrorCode { get; }
+
+        public AzureDevOpsApiException(string message) : base(message)
         {
+            StatusCode = HttpStatusCode.InternalServerError;
+            ErrorCode = null;
         }
 
-        public AzureDevOpsApiException(string? message) : base(message)
+        public AzureDevOpsApiException(string message, Exception innerException) 
+            : base(message, innerException)
         {
+            StatusCode = HttpStatusCode.InternalServerError;
+            ErrorCode = null;
         }
 
-        public AzureDevOpsApiException(string? message, Exception? innerException) : base(message, innerException)
+        public AzureDevOpsApiException(string message, HttpStatusCode statusCode, string? errorCode = null)
+            : base(message)
         {
-        }
-
-        protected AzureDevOpsApiException(SerializationInfo info, StreamingContext context) : base(info, context)
-        {
+            StatusCode = statusCode;
+            ErrorCode = errorCode;
         }
     }
 }

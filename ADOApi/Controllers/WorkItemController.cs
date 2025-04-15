@@ -1,37 +1,41 @@
 ﻿using System.Collections.Generic;
 using System.Threading.Tasks;
-
-using ADOApi.Models;
-
-using ADOApi.Services;
-
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.TeamFoundation.WorkItemTracking.WebApi;
-using Microsoft.VisualStudio.Services.Common;
-using Microsoft.VisualStudio.Services.Organization.Client;
-using Microsoft.VisualStudio.Services.WebApi.Patch.Json;
-using Microsoft.VisualStudio.Services.WebApi;
-using Microsoft.VisualStudio.Services.WebApi.Patch;
-using ADOApi.Exceptions;
-using ADOApi.Interfaces;
+using Microsoft.Extensions.Logging;
+using Polly;
+using Polly.Retry;
+using ADOApi.Models;
+using ADOApi.Services;
 using Microsoft.TeamFoundation.WorkItemTracking.WebApi.Models;
-using Microsoft.VisualStudio.Services.TestManagement.TestPlanning.WebApi;
-using WorkItem = Microsoft.TeamFoundation.WorkItemTracking.WebApi.Models.WorkItem;
-using Microsoft.TeamFoundation.Build.WebApi;
+using ADOApi.Exceptions;
 
 namespace ADOApi.Controllers
 {
-
     [ApiController]
     [ApiVersion("1.0")]
     [Route("api/[controller]")]
     public class WorkItemController : ControllerBase
     {
         private readonly AzureDevOpsService _azureDevOpsService;
- 
-        public WorkItemController(AzureDevOpsService azureDevOpsService)
+        private readonly ILogger<WorkItemController> _logger;
+        private readonly AsyncRetryPolicy _retryPolicy;
+
+        public WorkItemController(AzureDevOpsService azureDevOpsService, ILogger<WorkItemController> logger)
         {
             _azureDevOpsService = azureDevOpsService;
+            _logger = logger;
+            
+            // Configure retry policy
+            _retryPolicy = Policy
+                .Handle<Exception>()
+                .WaitAndRetryAsync(3, retryAttempt => 
+                    TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)),
+                    onRetry: (exception, timeSpan, retryCount, context) =>
+                    {
+                        _logger.LogWarning(exception, 
+                            "Retry {RetryCount} after {Delay}ms due to: {Message}", 
+                            retryCount, timeSpan.TotalMilliseconds, exception.Message);
+                    });
         }
 
         [HttpGet("workitemtypes")]
@@ -39,7 +43,7 @@ namespace ADOApi.Controllers
         {
             try
             {
-                List<string> workItemTypes = await _azureDevOpsService.GetWorkItemTypesAsync(project);
+                var workItemTypes = await _azureDevOpsService.GetWorkItemTypesAsync(project);
                 return Ok(workItemTypes);
             }
             catch (Exception ex)
@@ -73,11 +77,11 @@ namespace ADOApi.Controllers
             }
         }        
         [HttpGet("workitemsbytype")]
-        public async Task<ActionResult<List<WorkItem>>> GetWorkItemsByType(string project, string workItemtype)
+        public async Task<ActionResult<List<WorkItem>>> GetWorkItemsByType(string project, string workItemType)
         {
             try
             {
-                List<WorkItem> workItems = await _azureDevOpsService.GetWorkItemsByTypeAsync(project,workItemtype);
+                var workItems = await _azureDevOpsService.GetWorkItemsByTypeAsync(project, workItemType);
                 return Ok(workItems);
             }
             catch (Exception ex)
@@ -85,57 +89,61 @@ namespace ADOApi.Controllers
                 return StatusCode(500, $"Error: {ex.Message}");
             }
         }
-        [HttpPost("addworkitem")]
-        public async Task<ActionResult<int>> AddWorkItem(WorkItemDetailsRequest request)
+        [HttpPost]
+        public async Task<ActionResult<int>> AddWorkItem([FromBody] WorkItemDetailsRequest request)
         {
+            if (string.IsNullOrEmpty(request.Project) || string.IsNullOrEmpty(request.WorkItemType))
+            {
+                return BadRequest("Project and WorkItemType are required");
+            }
+
             try
             {
-                int parentId = 0;
-                if (!string.IsNullOrEmpty(request.ParentWorkItemId))
-                {
-                    parentId = int.Parse(request.ParentWorkItemId);
-                }
-
-                int workItemId = await _azureDevOpsService.AddWorkItemAsync(
+                var workItemId = await _azureDevOpsService.AddWorkItemAsync(
                     request.Project,
                     request.WorkItemType,
-                    request.Title,
-                    request.Description,
-                    request.AssignedTo,
-                    request.Tag,
+                    request.Title ?? string.Empty,
+                    request.Description ?? string.Empty,
+                    request.AssignedTo ?? string.Empty,
+                    request.Tag ?? string.Empty,
                     request.EffortHours,
-                    request.Comments,
-                    parentId
-                );
+                    request.Comments ?? string.Empty,
+                    request.ParentWorkItemId);
 
-                return workItemId;
+                return Ok(workItemId);
             }
             catch (Exception ex)
             {
-                return BadRequest($"Error adding work item: {ex.Message}");
+                return StatusCode(500, $"Error adding work item: {ex.Message}");
             }
-        }       
-
-        
-        [HttpPut("updateworkitem")]
-        public async Task<IActionResult> UpdateWorkItem(int workItemId, [FromBody] UpdateWorkItemModel model)
+        }
+        [HttpPut("{workItemId}")]
+        public async Task<ActionResult<bool>> UpdateWorkItem(
+            int workItemId,
+            [FromBody] WorkItemUpdateRequest request)
         {
-            // Call the service method to update the work item
-            bool success = await _azureDevOpsService.UpdateWorkItemAsync(
-             workItemId,
-             model.State,
-             model.Comment,
-             model.AssignedTo,
-             model.Priority,
-             model.RemainingEffortHours,
-             model.CompletedEffortHours, model.Tag);
-            if (success)
+            if (string.IsNullOrEmpty(request.State))
             {
-                return Ok("Work item updated successfully.");
+                return BadRequest("State is required");
             }
-            else
+
+            try
             {
-                return BadRequest("Failed to update work item.");
+                var result = await _azureDevOpsService.UpdateWorkItemAsync(
+                    workItemId,
+                    request.State,
+                    request.Comment ?? string.Empty,
+                    request.AssignedUser ?? string.Empty,
+                    request.Priority,
+                    request.RemainingEffortHours,
+                    request.CompletedEffortHours,
+                    request.Tag);
+
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Error updating work item: {ex.Message}");
             }
         }
         [HttpGet("workitembyid")]
@@ -159,9 +167,143 @@ namespace ADOApi.Controllers
                 return StatusCode(500, $"An error occurred while retrieving the work item: {ex.Message}");
             }
         }
+        [HttpGet("recent")]
+        public async Task<ActionResult<List<RecentWorkItem>>> GetRecentWorkItems()
+        {
+            try
+            {
+                var workItems = await _azureDevOpsService.GetRecentWorkItemsAsync();
+                return Ok(workItems);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Error retrieving recent work items: {ex.Message}");
+            }
+        }
+        [HttpGet("{workItemId}")]
+        public async Task<ActionResult<WorkItem>> GetWorkItem(int workItemId, [FromQuery] string project)
+        {
+            if (string.IsNullOrEmpty(project))
+            {
+                return BadRequest("Project is required");
+            }
+
+            try
+            {
+                var workItem = await _azureDevOpsService.GetWorkItemByIdAsync(workItemId, project);
+                return Ok(workItem);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Error retrieving work item: {ex.Message}");
+            }
+        }
+        [HttpGet("project/{project}")]
+        public async Task<ActionResult<List<WorkItem>>> GetAllWorkItemsForProject(string project)
+        {
+            try
+            {
+                var workItems = await _azureDevOpsService.GetAllWorkItemsForProjectAsync(project);
+                return Ok(workItems);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Error retrieving project work items: {ex.Message}");
+            }
+        }
+        [HttpGet("assigned/{project}/{userIdentifier}")]
+        public async Task<ActionResult<List<WorkItem>>> GetMyAssignedWorkItems(string project, string userIdentifier)
+        {
+            try
+            {
+                var workItems = await _azureDevOpsService.GetMyAssignedWorkItemsAsync(project, userIdentifier);
+                return Ok(workItems);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Error retrieving assigned work items: {ex.Message}");
+            }
+        }
+
+        [HttpPost("templates")]
+        public async Task<ActionResult<int>> CreateTemplate([FromBody] ADOApi.Models.WorkItemTemplate template)
+        {
+            try
+            {
+                return await _retryPolicy.ExecuteAsync(async () =>
+                {
+                    var templateId = await _azureDevOpsService.CreateWorkItemTemplateAsync(template);
+                    return Ok(templateId);
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error creating work item template");
+                return StatusCode(500, new { error = "Failed to create template", details = ex.Message });
+            }
+        }
+
+        [HttpGet("templates/{project}")]
+        public async Task<ActionResult<List<ADOApi.Models.WorkItemTemplate>>> GetTemplates(string project)
+        {
+            try
+            {
+                return await _retryPolicy.ExecuteAsync(async () =>
+                {
+                    var templates = await _azureDevOpsService.GetWorkItemTemplatesAsync(project);
+                    return Ok(templates);
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving work item templates");
+                return StatusCode(500, new { error = "Failed to retrieve templates", details = ex.Message });
+            }
+        }
+
+        [HttpPost("from-template/{templateId}")]
+        public async Task<ActionResult<int>> CreateFromTemplate(int templateId, [FromBody] Dictionary<string, object>? overrides = null)
+        {
+            try
+            {
+                var workItemId = await _azureDevOpsService.CreateWorkItemFromTemplateAsync(templateId, overrides);
+                return Ok(workItemId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error creating work item from template");
+                return StatusCode(500, new { error = "Failed to create work item from template", details = ex.Message });
+            }
+        }
+
+        [HttpDelete("templates/{templateId}")]
+        public async Task<ActionResult> DeleteTemplate(int templateId)
+        {
+            try
+            {
+                await _azureDevOpsService.DeleteWorkItemTemplateAsync(templateId);
+                return NoContent();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error deleting work item template");
+                return StatusCode(500, new { error = "Failed to delete template", details = ex.Message });
+            }
+        }
     }
-}
-internal class AzureDevOpsProcesses
+
+    public class WorkItemUpdateRequest
+    {
+        public required string State { get; set; }
+        public string? Comment { get; set; }
+        public string? AssignedUser { get; set; }
+        public int? Priority { get; set; }
+        public double? RemainingEffortHours { get; set; }
+        public double? CompletedEffortHours { get; set; }
+        public string? Tag { get; set; }
+    }
+
+    internal class AzureDevOpsProcesses
     {
         public static readonly List<string> Processes = new List<string>
         {
@@ -177,3 +319,4 @@ internal class AzureDevOpsProcesses
         "Legacy Upgrade"
         };
     }
+}
