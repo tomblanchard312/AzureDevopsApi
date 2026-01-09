@@ -15,8 +15,8 @@ namespace ADOApi.Interfaces
         Task<List<GitRef>> GetBranchesAsync(string project, string repositoryId);
         Task<GitPush> CreateBranchAsync(string project, string repositoryId, string newBranchName, string sourceBranch);
         Task<GitPush> CreateFileAsync(string project, string repositoryId, string path, string content, string branch, string commitMessage);
-        Task<GitPush> UpdateFileAsync(string project, string repositoryId, string path, string content, string branch, string commitMessage);
-        Task DeleteFileAsync(string project, string repositoryId, string path, string branch, string commitMessage);
+        Task<GitPush> UpdateFileAsync(string project, string repositoryId, string path, string content, string branch, string commitMessage, string baseCommitId);
+        Task DeleteFileAsync(string project, string repositoryId, string path, string branch, string commitMessage, string baseCommitId);
         Task<RepositoryStructure> GetRepositoryStructureAsync(string project, string repositoryId, string? path = null);
     }
 

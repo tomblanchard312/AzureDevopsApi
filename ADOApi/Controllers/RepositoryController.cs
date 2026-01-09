@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using ADOApi.Interfaces;
+using System.Security.Cryptography;
+using System.Text.Json;
 using Microsoft.TeamFoundation.SourceControl.WebApi;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -12,29 +14,22 @@ namespace ADOApi.Controllers
     [ApiController]
     [ApiVersion("1.0")]
     [Route("api/[controller]")]
+    [Microsoft.AspNetCore.Authorization.Authorize(Policy = "ADO.ReadOnly")]
     public class RepositoryController : ControllerBase
     {
         private readonly IRepositoryService _repositoryService;
         private readonly ILogger<RepositoryController> _logger;
-        private readonly AsyncRetryPolicy _retryPolicy;
 
-        public RepositoryController(IRepositoryService repositoryService, ILogger<RepositoryController> logger)
+        private readonly IAuditLogger _auditLogger;
+
+        public RepositoryController(IRepositoryService repositoryService, ILogger<RepositoryController> logger, IAuditLogger auditLogger)
         {
             _repositoryService = repositoryService;
             _logger = logger;
-
-            // Configure retry policy
-            _retryPolicy = Policy
-                .Handle<Exception>()
-                .WaitAndRetryAsync(3, retryAttempt => 
-                    TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)),
-                    onRetry: (exception, timeSpan, retryCount, context) =>
-                    {
-                        _logger.LogWarning(exception, 
-                            "Retry {RetryCount} after {Delay}ms due to: {Message}", 
-                            retryCount, timeSpan.TotalMilliseconds, exception.Message);
-                    });
+            _auditLogger = auditLogger;
         }
+
+        private static string SanitizeForLog(string input) => input?.Replace("\n", "").Replace("\r", "").Replace("\t", "") ?? "";
 
         [HttpGet("repositories/{project}")]
         public async Task<ActionResult<List<GitRepository>>> GetRepositories(string project)
@@ -42,6 +37,20 @@ namespace ADOApi.Controllers
             try
             {
                 var repositories = await _repositoryService.GetRepositoriesAsync(project);
+
+                // Compute ETag
+                var json = JsonSerializer.Serialize(repositories);
+                using var sha = SHA256.Create();
+                var hash = sha.ComputeHash(System.Text.Encoding.UTF8.GetBytes(json));
+                var etag = '"' + Convert.ToBase64String(hash) + '"';
+
+                var clientEtag = Request.Headers["If-None-Match"].ToString();
+                if (!string.IsNullOrEmpty(clientEtag) && clientEtag == etag)
+                {
+                    return StatusCode(304);
+                }
+
+                Response.Headers["ETag"] = etag;
                 return Ok(repositories);
             }
             catch (Exception ex)
@@ -132,6 +141,19 @@ namespace ADOApi.Controllers
             try
             {
                 var branches = await _repositoryService.GetBranchesAsync(project, repositoryId);
+
+                var json = JsonSerializer.Serialize(branches);
+                using var sha = SHA256.Create();
+                var hash = sha.ComputeHash(System.Text.Encoding.UTF8.GetBytes(json));
+                var etag = '"' + Convert.ToBase64String(hash) + '"';
+
+                var clientEtag = Request.Headers["If-None-Match"].ToString();
+                if (!string.IsNullOrEmpty(clientEtag) && clientEtag == etag)
+                {
+                    return StatusCode(304);
+                }
+
+                Response.Headers["ETag"] = etag;
                 return Ok(branches);
             }
             catch (Exception ex)
@@ -142,15 +164,36 @@ namespace ADOApi.Controllers
         }
 
         [HttpPost("branches/{project}/{repositoryId}")]
+        [Microsoft.AspNetCore.Authorization.Authorize(Policy = "ADO.Contributor")]
         public async Task<ActionResult<GitPush>> CreateBranch(string project, string repositoryId, [FromBody] CreateBranchRequest request)
         {
+            var evt = new ADOApi.Models.AuditEvent
+            {
+                Action = "CreateBranch",
+                TargetType = "branch",
+                TargetId = request.NewBranchName,
+                Project = project,
+                RepositoryId = repositoryId,
+                CorrelationId = HttpContext.Items["CorrelationId"] as string,
+                ClientIp = HttpContext.Items["ClientIp"] as string,
+                UserAgent = HttpContext.Items["UserAgent"] as string,
+                ActorObjectId = HttpContext.Items["ActorObjectId"] as string,
+                ActorUpn = HttpContext.Items["ActorUpn"] as string
+            };
+
             try
             {
                 var push = await _repositoryService.CreateBranchAsync(project, repositoryId, request.NewBranchName, request.SourceBranch);
+                evt.Success = true;
+                evt.TargetId = request.NewBranchName;
+                await _auditLogger.AuditAsync(evt);
                 return Ok(push);
             }
             catch (Exception ex)
             {
+                evt.Success = false;
+                evt.ErrorMessage = ex.Message;
+                await _auditLogger.AuditAsync(evt);
                 _logger.LogError(ex, "Error creating branch {NewBranchName} from {SourceBranch} in repository {RepositoryId}", 
                     request.NewBranchName, request.SourceBranch, repositoryId);
                 return StatusCode(500, $"Error: {ex.Message}");
@@ -158,15 +201,35 @@ namespace ADOApi.Controllers
         }
 
         [HttpPost("files/{project}/{repositoryId}")]
+        [Microsoft.AspNetCore.Authorization.Authorize(Policy = "ADO.Contributor")]
         public async Task<ActionResult<GitPush>> CreateFile(string project, string repositoryId, [FromBody] CreateFileRequest request)
         {
+            var evt = new ADOApi.Models.AuditEvent
+            {
+                Action = "CreateFile",
+                TargetType = "file",
+                TargetId = request.Path,
+                Project = project,
+                RepositoryId = repositoryId,
+                CorrelationId = HttpContext.Items["CorrelationId"] as string,
+                ClientIp = HttpContext.Items["ClientIp"] as string,
+                UserAgent = HttpContext.Items["UserAgent"] as string,
+                ActorObjectId = HttpContext.Items["ActorObjectId"] as string,
+                ActorUpn = HttpContext.Items["ActorUpn"] as string
+            };
+
             try
             {
                 var push = await _repositoryService.CreateFileAsync(project, repositoryId, request.Path, request.Content, request.Branch, request.CommitMessage);
+                evt.Success = true;
+                await _auditLogger.AuditAsync(evt);
                 return Ok(push);
             }
             catch (Exception ex)
             {
+                evt.Success = false;
+                evt.ErrorMessage = ex.Message;
+                await _auditLogger.AuditAsync(evt);
                 _logger.LogError(ex, "Error creating file {Path} in branch {Branch} of repository {RepositoryId}", 
                     request.Path, request.Branch, repositoryId);
                 return StatusCode(500, $"Error: {ex.Message}");
@@ -174,15 +237,51 @@ namespace ADOApi.Controllers
         }
 
         [HttpPut("files/{project}/{repositoryId}")]
+        [ProducesResponseType(typeof(GitPush), 200)]
+        [ProducesResponseType(400)]
+        [ProducesResponseType(409)]
+        [Microsoft.AspNetCore.Authorization.Authorize(Policy = "ADO.Contributor")]
         public async Task<ActionResult<GitPush>> UpdateFile(string project, string repositoryId, [FromBody] UpdateFileRequest request)
         {
+            var evt = new ADOApi.Models.AuditEvent
+            {
+                Action = "UpdateFile",
+                TargetType = "file",
+                TargetId = request.Path,
+                Project = project,
+                RepositoryId = repositoryId,
+                CorrelationId = HttpContext.Items["CorrelationId"] as string,
+                ClientIp = HttpContext.Items["ClientIp"] as string,
+                UserAgent = HttpContext.Items["UserAgent"] as string,
+                ActorObjectId = HttpContext.Items["ActorObjectId"] as string,
+                ActorUpn = HttpContext.Items["ActorUpn"] as string
+            };
+
+            if (string.IsNullOrEmpty(request.BaseCommitId))
+            {
+                return BadRequest("BaseCommitId is required for optimistic concurrency");
+            }
+
             try
             {
-                var push = await _repositoryService.UpdateFileAsync(project, repositoryId, request.Path, request.Content, request.Branch, request.CommitMessage);
+                var push = await _repositoryService.UpdateFileAsync(project, repositoryId, request.Path, request.Content, request.Branch, request.CommitMessage, request.BaseCommitId);
+                evt.Success = true;
+                await _auditLogger.AuditAsync(evt);
                 return Ok(push);
+            }
+            catch (ADOApi.Exceptions.AzureDevOpsApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Conflict)
+            {
+                evt.Success = false;
+                evt.ErrorMessage = ex.Message;
+                await _auditLogger.AuditAsync(evt);
+                _logger.LogWarning(ex, "Conflict updating file {Path} in branch {Branch} of repository {RepositoryId}", request.Path, request.Branch, repositoryId);
+                return Conflict(new { error = "Conflict", details = ex.Message });
             }
             catch (Exception ex)
             {
+                evt.Success = false;
+                evt.ErrorMessage = ex.Message;
+                await _auditLogger.AuditAsync(evt);
                 _logger.LogError(ex, "Error updating file {Path} in branch {Branch} of repository {RepositoryId}", 
                     request.Path, request.Branch, repositoryId);
                 return StatusCode(500, $"Error: {ex.Message}");
@@ -190,17 +289,52 @@ namespace ADOApi.Controllers
         }
 
         [HttpDelete("files/{project}/{repositoryId}")]
+        [ProducesResponseType(204)]
+        [ProducesResponseType(400)]
+        [ProducesResponseType(409)]
+        [Microsoft.AspNetCore.Authorization.Authorize(Policy = "ADO.Contributor")]
         public async Task<ActionResult> DeleteFile(string project, string repositoryId, [FromBody] DeleteFileRequest request)
         {
+            var evt = new ADOApi.Models.AuditEvent
+            {
+                Action = "DeleteFile",
+                TargetType = "file",
+                TargetId = request.Path,
+                Project = project,
+                RepositoryId = repositoryId,
+                CorrelationId = HttpContext.Items["CorrelationId"] as string,
+                ClientIp = HttpContext.Items["ClientIp"] as string,
+                UserAgent = HttpContext.Items["UserAgent"] as string,
+                ActorObjectId = HttpContext.Items["ActorObjectId"] as string,
+                ActorUpn = HttpContext.Items["ActorUpn"] as string
+            };
+
+            if (string.IsNullOrEmpty(request.BaseCommitId))
+            {
+                return BadRequest("BaseCommitId is required for optimistic concurrency");
+            }
+
             try
             {
-                await _repositoryService.DeleteFileAsync(project, repositoryId, request.Path, request.Branch, request.CommitMessage);
+                await _repositoryService.DeleteFileAsync(project, repositoryId, request.Path, request.Branch, request.CommitMessage, request.BaseCommitId);
+                evt.Success = true;
+                await _auditLogger.AuditAsync(evt);
                 return NoContent();
+            }
+            catch (ADOApi.Exceptions.AzureDevOpsApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Conflict)
+            {
+                evt.Success = false;
+                evt.ErrorMessage = ex.Message;
+                await _auditLogger.AuditAsync(evt);
+                _logger.LogWarning(ex, "Conflict deleting file {Path} in branch {Branch} of repository {RepositoryId}", request.Path, request.Branch, repositoryId);
+                return Conflict(new { error = "Conflict", details = ex.Message });
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error deleting file {Path} in branch {Branch} of repository {RepositoryId}", 
-                    request.Path, request.Branch, repositoryId);
+                evt.Success = false;
+                evt.ErrorMessage = ex.Message;
+                await _auditLogger.AuditAsync(evt);
+                _logger.LogError(ex, "Error deleting file in repository {RepositoryId}", repositoryId);
                 return StatusCode(500, $"Error: {ex.Message}");
             }
         }
@@ -241,6 +375,8 @@ namespace ADOApi.Controllers
         public required string Content { get; set; }
         public required string Branch { get; set; }
         public required string CommitMessage { get; set; }
+        // The base commit id (objectId) that the client observed. Required for optimistic concurrency.
+        public required string BaseCommitId { get; set; }
     }
 
     public class DeleteFileRequest
@@ -248,5 +384,7 @@ namespace ADOApi.Controllers
         public required string Path { get; set; }
         public required string Branch { get; set; }
         public required string CommitMessage { get; set; }
+        // The base commit id (objectId) that the client observed. Required for optimistic concurrency.
+        public required string BaseCommitId { get; set; }
     }
 } 

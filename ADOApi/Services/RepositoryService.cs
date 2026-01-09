@@ -1,6 +1,8 @@
 using Microsoft.TeamFoundation.SourceControl.WebApi;
 using Microsoft.VisualStudio.Services.WebApi;
 using Microsoft.Extensions.Logging;
+using ADOApi.Services;
+using Microsoft.Extensions.Configuration;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -15,35 +17,36 @@ namespace ADOApi.Services
     {
         private readonly GitHttpClient _gitClient;
         private readonly ILogger<RepositoryService> _logger;
-        private readonly AsyncRetryPolicy _retryPolicy;
+        private readonly ResiliencePolicies _policies;
+        private readonly ICachingService _cache;
+        private readonly IConfiguration _configuration;
 
-        public RepositoryService(GitHttpClient gitClient, ILogger<RepositoryService> logger)
+        public RepositoryService(GitHttpClient gitClient, ILogger<RepositoryService> logger, ResiliencePolicies policies, ICachingService cache, IConfiguration configuration)
         {
             _gitClient = gitClient;
             _logger = logger;
-
-            // Configure retry policy
-            _retryPolicy = Polly.Policy
-                .Handle<Exception>()
-                .WaitAndRetryAsync(3, retryAttempt => 
-                    TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)),
-                    onRetry: (exception, timeSpan, retryCount, context) =>
-                    {
-                        _logger.LogWarning(exception, 
-                            "Retry {RetryCount} after {Delay}ms due to: {Message}", 
-                            retryCount, timeSpan.TotalMilliseconds, exception.Message);
-                    });
+            _policies = policies;
+            _cache = cache;
+            _configuration = configuration;
         }
 
         public async Task<List<GitRepository>> GetRepositoriesAsync(string project)
         {
             try
             {
-                return await _retryPolicy.ExecuteAsync(async () =>
+                var org = _configuration["AzureDevOps:OrganizationUrl"]?.TrimEnd('/') ?? "org";
+                var key = $"org:{org}:project:{project}:repositories";
+                int minutes = 10;
+                if (!int.TryParse(_configuration["Caching:RepositoriesMinutes"], out minutes)) minutes = 10;
+
+                return await _cache.GetOrSetAsync<List<GitRepository>>(key, async () =>
                 {
-                    var repositories = await _gitClient.GetRepositoriesAsync(project);
-                    return repositories;
-                });
+                    return await _policies.ExecuteAsync(async () =>
+                    {
+                        var repositories = await _gitClient.GetRepositoriesAsync(project);
+                        return repositories;
+                    });
+                }, TimeSpan.FromMinutes(minutes));
             }
             catch (Exception ex)
             {
@@ -56,7 +59,7 @@ namespace ADOApi.Services
         {
             try
             {
-                return await _retryPolicy.ExecuteAsync(async () =>
+                return await _policies.ExecuteAsync(async () =>
                 {
                     var item = await _gitClient.GetItemAsync(
                         repositoryId: repositoryId,
@@ -77,7 +80,7 @@ namespace ADOApi.Services
         {
             try
             {
-                return await _retryPolicy.ExecuteAsync(async () =>
+                return await _policies.ExecuteAsync(async () =>
                 {
                     var items = await _gitClient.GetItemsAsync(
                         project,
@@ -98,7 +101,7 @@ namespace ADOApi.Services
         {
             try
             {
-                return await _retryPolicy.ExecuteAsync(async () =>
+                return await _policies.ExecuteAsync(async () =>
                 {
                     var commit = await _gitClient.GetCommitAsync(commitId, repositoryId, project);
                     return commit;
@@ -115,7 +118,7 @@ namespace ADOApi.Services
         {
             try
             {
-                return await _retryPolicy.ExecuteAsync(async () =>
+                return await _policies.ExecuteAsync(async () =>
                 {
                     var commits = await _gitClient.GetCommitsAsync(
                         project,
@@ -146,7 +149,7 @@ namespace ADOApi.Services
         {
             try
             {
-                return await _retryPolicy.ExecuteAsync(async () =>
+                return await _policies.ExecuteAsync(async () =>
                 {
                     var branch = await _gitClient.GetRefsAsync(
                         project,
@@ -173,16 +176,24 @@ namespace ADOApi.Services
         {
             try
             {
-                return await _retryPolicy.ExecuteAsync(async () =>
+                var org = _configuration["AzureDevOps:OrganizationUrl"]?.TrimEnd('/') ?? "org";
+                var key = $"org:{org}:project:{project}:repo:{repositoryId}:branches";
+                int minutes = 5;
+                if (!int.TryParse(_configuration["Caching:BranchesMinutes"], out minutes)) minutes = 5;
+
+                return await _cache.GetOrSetAsync<List<GitRef>>(key, async () =>
                 {
-                    var branches = await _gitClient.GetRefsAsync(
-                        project,
-                        repositoryId,
-                        filter: null,
-                        includeStatuses: true,
-                        includeLinks: true);
-                    return branches;
-                });
+                    return await _policies.ExecuteAsync(async () =>
+                    {
+                        var branches = await _gitClient.GetRefsAsync(
+                            project,
+                            repositoryId,
+                            filter: null,
+                            includeStatuses: true,
+                            includeLinks: true);
+                        return branches;
+                    });
+                }, TimeSpan.FromMinutes(minutes));
             }
             catch (Exception ex)
             {
@@ -195,7 +206,7 @@ namespace ADOApi.Services
         {
             try
             {
-                return await _retryPolicy.ExecuteAsync(async () =>
+                return await _policies.ExecuteAsync(async () =>
                 {
                     var sourceRef = await GetBranchAsync(project, repositoryId, sourceBranch);
                     if (sourceRef == null)
@@ -241,7 +252,7 @@ namespace ADOApi.Services
         {
             try
             {
-                return await _retryPolicy.ExecuteAsync(async () =>
+                return await _policies.ExecuteAsync(async () =>
                 {
                     var branchRef = await GetBranchAsync(project, repositoryId, branch);
                     if (branchRef == null)
@@ -291,11 +302,11 @@ namespace ADOApi.Services
             }
         }
 
-        public async Task<GitPush> UpdateFileAsync(string project, string repositoryId, string path, string content, string branch, string commitMessage)
+        public async Task<GitPush> UpdateFileAsync(string project, string repositoryId, string path, string content, string branch, string commitMessage, string baseCommitId)
         {
             try
             {
-                return await _retryPolicy.ExecuteAsync(async () =>
+                return await _policies.ExecuteAsync(async () =>
                 {
                     var branchRef = await GetBranchAsync(project, repositoryId, branch);
                     if (branchRef == null)
@@ -321,7 +332,8 @@ namespace ADOApi.Services
                             new GitRefUpdate
                             {
                                 Name = $"refs/heads/{branch}",
-                                OldObjectId = branchRef.ObjectId
+                                // Use the client-provided base commit id to enforce optimistic concurrency
+                                OldObjectId = baseCommitId
                             }
                         },
                         Commits = new List<GitCommitRef>
@@ -334,7 +346,15 @@ namespace ADOApi.Services
                         }
                     };
 
-                    return await _gitClient.CreatePushAsync(push, repositoryId, project);
+                    try
+                    {
+                        return await _gitClient.CreatePushAsync(push, repositoryId, project);
+                    }
+                    catch (Microsoft.VisualStudio.Services.Common.VssServiceException ex)
+                    {
+                        // Map precondition/conflict errors to a 409 for the API
+                        throw new AzureDevOpsApiException("Conflict updating file - base commit does not match", System.Net.HttpStatusCode.Conflict, ex.Message);
+                    }
                 });
             }
             catch (Exception ex)
@@ -345,11 +365,11 @@ namespace ADOApi.Services
             }
         }
 
-        public async Task DeleteFileAsync(string project, string repositoryId, string path, string branch, string commitMessage)
+        public async Task DeleteFileAsync(string project, string repositoryId, string path, string branch, string commitMessage, string baseCommitId)
         {
             try
             {
-                await _retryPolicy.ExecuteAsync(async () =>
+                await _policies.ExecuteAsync(async () =>
                 {
                     var branchRef = await GetBranchAsync(project, repositoryId, branch);
                     if (branchRef == null)
@@ -370,7 +390,8 @@ namespace ADOApi.Services
                             new GitRefUpdate
                             {
                                 Name = $"refs/heads/{branch}",
-                                OldObjectId = branchRef.ObjectId
+                                // Use the client-provided base commit id to enforce optimistic concurrency
+                                OldObjectId = baseCommitId
                             }
                         },
                         Commits = new List<GitCommitRef>
@@ -383,7 +404,14 @@ namespace ADOApi.Services
                         }
                     };
 
-                    await _gitClient.CreatePushAsync(push, repositoryId, project);
+                    try
+                    {
+                        await _gitClient.CreatePushAsync(push, repositoryId, project);
+                    }
+                    catch (Microsoft.VisualStudio.Services.Common.VssServiceException ex)
+                    {
+                        throw new AzureDevOpsApiException("Conflict deleting file - base commit does not match", System.Net.HttpStatusCode.Conflict, ex.Message);
+                    }
                 });
             }
             catch (Exception ex)
@@ -398,7 +426,7 @@ namespace ADOApi.Services
         {
             try
             {
-                return await _retryPolicy.ExecuteAsync(async () =>
+                return await _policies.ExecuteAsync(async () =>
                 {
                     var items = await _gitClient.GetItemsAsync(
                         project,

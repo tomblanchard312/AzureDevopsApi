@@ -1,0 +1,41 @@
+title = "gitleaks config"
+
+[[rules]]
+path = '(appsettings\.json|README\.md|SECURITY\.md|docs/.*\.md)$'
+id = "placeholder-secrets"
+description = "Allow placeholder secrets in documentation and config files"
+regex = '\[Your [A-Za-z ]+\]'
+allowlist = [
+    "[Your PAT]",
+    "[Your Tenant ID]",
+    "[Your API Client ID]",
+    "[Your Client ID]",
+    "[Stored in Key Vault]",
+    "[Your Organization]",
+    "[deployment-name]",
+    "[azure-openai-endpoint]",
+]
+
+[[rules]]
+id = "generic-api-key"
+description = "Generic API Key"
+regex = '''(?i)(api_key|apikey|secret|token|password|key)([\'\"]?[\s]*[=:][\s]*[\'\"]?)([a-zA-Z0-9+/=]{20,})'''
+allowlist = ["[Your PAT]", "[Stored in Key Vault]"]
+
+[[rules]]
+id = "azure-client-secret"
+description = "Azure Client Secret"
+regex = '''(?i)(client_secret|clientsecret)([\'\"]?[\s]*[=:][\s]*[\'\"]?)([a-zA-Z0-9+/=~-]{20,})'''
+allowlist = ["[Stored in Key Vault]"]
+
+[[rules]]
+id = "azure-tenant-id"
+description = "Azure Tenant ID"
+regex = '''[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}'''
+allowlist = ["[Your Tenant ID]"]
+
+[[rules]]
+id = "azure-subscription-id"
+description = "Azure Subscription ID"
+regex = '''[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}'''
+allowlist = ["[Your Tenant ID]"]

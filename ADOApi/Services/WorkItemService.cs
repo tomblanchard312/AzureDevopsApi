@@ -466,10 +466,24 @@ namespace ADOApi.Services
             }
         }
 
-        public async Task<WorkItem> UpdateWorkItemAsync(JsonPatchDocument patchDocument, int workItemId)
+        public async Task<WorkItem> UpdateWorkItemAsync(JsonPatchDocument patchDocument, int workItemId, int? rev = null)
         {
             try
             {
+                if (rev.HasValue)
+                {
+                    var current = await _workItemTrackingHttpClient.GetWorkItemAsync(workItemId, expand: WorkItemExpand.None);
+                    if (current == null)
+                    {
+                        throw new AzureDevOpsApiException($"Work item {workItemId} not found");
+                    }
+
+                    if (current.Rev != rev.Value)
+                    {
+                        throw new AzureDevOpsApiException("Revision mismatch", System.Net.HttpStatusCode.Conflict, "Revision does not match current work item revision");
+                    }
+                }
+
                 return await _workItemTrackingHttpClient.UpdateWorkItemAsync(patchDocument, workItemId);
             }
             catch (Exception ex)

@@ -8,6 +8,8 @@ using System.Text.Json;
 using System.Linq;
 using ADOApi.Models;
 using ADOApi.Utilities;
+using ADOApi.Services;
+using Microsoft.Extensions.Configuration;
 using Microsoft.VisualStudio.Services.WebApi.Patch.Json;
 using Microsoft.VisualStudio.Services.WebApi.Patch;
 using ADOApi.Interfaces;
@@ -31,41 +33,48 @@ namespace ADOApi.Services
 {
     public class AzureDevOpsService : IAzureDevOpsService
     {
+        // In-memory metadata store for PATs. Production should replace this with secure, append-only storage.
+        private readonly List<PatMetadata> _patMetadataStore = new();
+
         private readonly IWorkItemService _workItemService;
         private readonly ILogger<AzureDevOpsService> _logger;
         private readonly ProjectHttpClient _projectClient;
         private readonly WorkItemTrackingHttpClient _workItemTrackingHttpClient;
-        private readonly AsyncRetryPolicy _retryPolicy;
+        private readonly ResiliencePolicies _policies;
+        private readonly ICachingService _cache;
+        private readonly IConfiguration _configuration;
 
         public AzureDevOpsService(
             IWorkItemService workItemService,
             ILogger<AzureDevOpsService> logger,
-            VssConnection connection)
+            VssConnection connection,
+            ResiliencePolicies policies,
+            ICachingService cache,
+            IConfiguration configuration)
         {
             _workItemService = workItemService;
             _logger = logger;
             _projectClient = connection.GetClient<ProjectHttpClient>();
             _workItemTrackingHttpClient = connection.GetClient<WorkItemTrackingHttpClient>();
-            
-            // Configure retry policy
-            _retryPolicy = Polly.Policy
-                .Handle<Exception>()
-                .WaitAndRetryAsync(3, retryAttempt => 
-                    TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)),
-                    onRetry: (exception, timeSpan, retryCount, context) =>
-                    {
-                        _logger.LogWarning(exception, 
-                            "Retry {RetryCount} after {Delay}ms due to: {Message}", 
-                            retryCount, timeSpan.TotalMilliseconds, exception.Message);
-                    });
+            _policies = policies;
+            _cache = cache;
+            _configuration = configuration;
         }
 
         public async Task<List<string>> GetProjectsAsync()
         {
             try
             {
-                var projects = await _projectClient.GetProjects();
-                return projects.Select(p => p.Name).ToList();
+                var org = _configuration["AzureDevOps:OrganizationUrl"]?.TrimEnd('/') ?? "org";
+                var key = $"org:{org}:projects";
+                int minutes = 30;
+                if (!int.TryParse(_configuration["Caching:ProjectsMinutes"], out minutes)) minutes = 30;
+
+                return await _cache.GetOrSetAsync<List<string>>(key, async () =>
+                {
+                    var projects = await _projectClient.GetProjects();
+                    return projects.Select(p => p.Name).ToList();
+                }, TimeSpan.FromMinutes(minutes));
             }
             catch (Exception ex)
             {
@@ -78,8 +87,16 @@ namespace ADOApi.Services
         {
             try
             {
-                var workItemTypes = await _workItemService.GetWorkItemTypesAsync(project);
-                return workItemTypes.Select(wit => wit.Name).ToList();
+                var org = _configuration["AzureDevOps:OrganizationUrl"]?.TrimEnd('/') ?? "org";
+                var key = $"org:{org}:project:{project}:workitemtypes";
+                int minutes = 15;
+                if (!int.TryParse(_configuration["Caching:WorkItemTypesMinutes"], out minutes)) minutes = 15;
+
+                return await _cache.GetOrSetAsync<List<string>>(key, async () =>
+                {
+                    var workItemTypes = await _workItemService.GetWorkItemTypesAsync(project);
+                    return workItemTypes.Select(wit => wit.Name).ToList();
+                }, TimeSpan.FromMinutes(minutes));
             }
             catch (Exception ex)
             {
@@ -92,8 +109,16 @@ namespace ADOApi.Services
         {
             try
             {
-                var iterations = await _workItemService.GetIterationsAsync(project);
-                return iterations.Select(i => i.Name).ToList();
+                var org = _configuration["AzureDevOps:OrganizationUrl"]?.TrimEnd('/') ?? "org";
+                var key = $"org:{org}:project:{project}:iterations";
+                int minutes = 15;
+                if (!int.TryParse(_configuration["Caching:IterationsMinutes"], out minutes)) minutes = 15;
+
+                return await _cache.GetOrSetAsync<List<string>>(key, async () =>
+                {
+                    var iterations = await _workItemService.GetIterationsAsync(project);
+                    return iterations.Select(i => i.Name).ToList();
+                }, TimeSpan.FromMinutes(minutes));
             }
             catch (Exception ex)
             {
@@ -117,7 +142,23 @@ namespace ADOApi.Services
         public async Task<List<PatResponse>> GetTokensAsync()
         {
             // Implementation for retrieving personal access tokens
-            throw new NotImplementedException();
+            // Return metadata as PatResponse without token values (AccessToken left empty)
+            return _patMetadataStore.Select(m => new PatResponse
+            {
+                AccessToken = string.Empty,
+                DisplayName = m.DisplayName,
+                Scope = m.Scope,
+                ValidTo = m.ValidTo,
+                AllOrgs = m.AllOrgs
+            }).ToList();
+        }
+
+        public Task StorePatMetadataAsync(PatMetadata metadata)
+        {
+            // Store only metadata in memory. Replace with secure persistent storage in production.
+            _patMetadataStore.Add(metadata);
+            _logger.LogInformation("Stored PAT metadata for {DisplayName} by {CreatedBy}", metadata.DisplayName, metadata.CreatedBy);
+            return Task.CompletedTask;
         }
 
         public async Task<int> AddWorkItemAsync(string project, string workItemType, string title, string description, string assignedTo, string tag, double? effortHours = null, string? comments = null, int? parentId = null)
@@ -132,10 +173,102 @@ namespace ADOApi.Services
             throw new NotImplementedException();
         }
 
-        public async Task<bool> UpdateWorkItemAsync(int workItemId, string state, string comment, string assignedUser, int? priority, double? remainingEffortHours, double? completedEffortHours, string? tag)
+        public async Task<bool> UpdateWorkItemAsync(int workItemId, string state, string comment, string assignedUser, int? priority, double? remainingEffortHours, double? completedEffortHours, string? tag, int? rev = null)
         {
-            // Implementation for updating a work item
-            throw new NotImplementedException();
+            try
+            {
+                var patchDocument = new Microsoft.VisualStudio.Services.WebApi.Patch.Json.JsonPatchDocument();
+
+                if (!string.IsNullOrEmpty(state))
+                {
+                    patchDocument.Add(new Microsoft.VisualStudio.Services.WebApi.Patch.Json.JsonPatchOperation
+                    {
+                        Operation = Microsoft.VisualStudio.Services.WebApi.Patch.Operation.Replace,
+                        Path = "/fields/System.State",
+                        Value = state
+                    });
+                }
+
+                if (!string.IsNullOrEmpty(comment))
+                {
+                    patchDocument.Add(new Microsoft.VisualStudio.Services.WebApi.Patch.Json.JsonPatchOperation
+                    {
+                        Operation = Microsoft.VisualStudio.Services.WebApi.Patch.Operation.Add,
+                        Path = "/fields/System.History",
+                        Value = comment + " - Added By Service Api"
+                    });
+                }
+
+                if (!string.IsNullOrEmpty(assignedUser))
+                {
+                    patchDocument.Add(new Microsoft.VisualStudio.Services.WebApi.Patch.Json.JsonPatchOperation
+                    {
+                        Operation = Microsoft.VisualStudio.Services.WebApi.Patch.Operation.Replace,
+                        Path = "/fields/System.AssignedTo",
+                        Value = assignedUser
+                    });
+                }
+
+                if (priority.HasValue)
+                {
+                    patchDocument.Add(new Microsoft.VisualStudio.Services.WebApi.Patch.Json.JsonPatchOperation
+                    {
+                        Operation = Microsoft.VisualStudio.Services.WebApi.Patch.Operation.Replace,
+                        Path = "/fields/Microsoft.VSTS.Common.Priority",
+                        Value = priority
+                    });
+                }
+
+                if (remainingEffortHours.HasValue && !string.Equals(state, "Closed", StringComparison.OrdinalIgnoreCase))
+                {
+                    patchDocument.Add(new Microsoft.VisualStudio.Services.WebApi.Patch.Json.JsonPatchOperation
+                    {
+                        Operation = Microsoft.VisualStudio.Services.WebApi.Patch.Operation.Replace,
+                        Path = "/fields/Microsoft.VSTS.Scheduling.RemainingWork",
+                        Value = remainingEffortHours.ToString()
+                    });
+                }
+
+                if (completedEffortHours.HasValue)
+                {
+                    patchDocument.Add(new Microsoft.VisualStudio.Services.WebApi.Patch.Json.JsonPatchOperation
+                    {
+                        Operation = Microsoft.VisualStudio.Services.WebApi.Patch.Operation.Replace,
+                        Path = "/fields/Microsoft.VSTS.Scheduling.CompletedWork",
+                        Value = completedEffortHours
+                    });
+                }
+
+                if (!string.IsNullOrEmpty(tag))
+                {
+                    patchDocument.Add(new Microsoft.VisualStudio.Services.WebApi.Patch.Json.JsonPatchOperation
+                    {
+                        Operation = Microsoft.VisualStudio.Services.WebApi.Patch.Operation.Add,
+                        Path = "/fields/System.Tags",
+                        Value = tag
+                    });
+                }
+
+                try
+                {
+                    var workItem = await _workItemService.UpdateWorkItemAsync(patchDocument, workItemId, rev);
+                    return workItem != null;
+                }
+                catch (Microsoft.VisualStudio.Services.Common.VssServiceException ex)
+                {
+                    // Map to 409 Conflict for concurrency errors
+                    throw new AzureDevOpsApiException("Conflict updating work item - revision does not match", System.Net.HttpStatusCode.Conflict, ex.Message);
+                }
+            }
+            catch (AzureDevOpsApiException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to update work item {WorkItemId}", workItemId);
+                throw new AzureDevOpsApiException("Failed to update work item", ex);
+            }
         }
 
         public async Task<int> CreateWorkItemTemplateAsync(Models.WorkItemTemplate template)
@@ -449,7 +582,7 @@ namespace ADOApi.Services
                         }
                     });
 
-                var workItem = await _workItemService.UpdateWorkItemAsync(patchDocument, workItemId);
+                var workItem = await _workItemService.UpdateWorkItemAsync(patchDocument, workItemId, null);
                 return workItem != null;
             }
             catch (Exception ex)
@@ -502,14 +635,14 @@ namespace ADOApi.Services
                 var wiql = BuildWiqlQuery(filter);
                 var query = new Wiql { Query = wiql };
                 
-                var queryResult = await _retryPolicy.ExecuteAsync(async () =>
+                var queryResult = await _policies.ExecuteAsync(async () =>
                     await _workItemTrackingHttpClient.QueryByWiqlAsync(query, filter.Project));
 
                 if (queryResult.WorkItems == null || !queryResult.WorkItems.Any())
                     return new List<WorkItem>();
 
                 var workItemIds = queryResult.WorkItems.Select(wi => wi.Id).ToArray();
-                var workItems = await _retryPolicy.ExecuteAsync(async () =>
+                var workItems = await _policies.ExecuteAsync(async () =>
                     await _workItemTrackingHttpClient.GetWorkItemsAsync(workItemIds));
 
                 return workItems.Select(wi => new WorkItem

@@ -11,6 +11,7 @@ namespace ADOApi.Interfaces
         Task<List<string>> GetIterationsAsync(string project);
         Task<List<WorkItem>> GetWorkItemsByTypeAsync(string project, string workItemType);
         Task<string> CreatePersonalAccessTokenAsync(string displayName, string scope, DateTime validTo, bool allOrgs = false);
+        Task StorePatMetadataAsync(ADOApi.Models.PatMetadata metadata);
         Task<List<PatResponse>> GetTokensAsync();
         Task<int> AddWorkItemAsync(string project, string workItemType, string title, string description, string assignedTo, string tag, double? effortHours = null, string? comments = null, int? parentId = null);
         Task<List<RecentWorkItem>> GetRecentWorkItemsAsync();
@@ -21,7 +22,8 @@ namespace ADOApi.Interfaces
             string assignedUser,
             int? priority,
             double? remainingEffortHours,
-            double? completedEffortHours, string? tag);
+            double? completedEffortHours, string? tag,
+            int? rev = null);
         Task<List<WorkItem>> GetAllWorkItemsForProjectAsync(string project);
         Task<List<WorkItem>> GetMyAssignedWorkItemsAsync(string project, string userIdentifier);
         Task<WorkItem> GetWorkItemByIdAsync(int workItemId, string project);
