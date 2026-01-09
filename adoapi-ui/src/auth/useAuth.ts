@@ -1,5 +1,6 @@
 import { useMsal } from '@azure/msal-react';
-import { useMemo } from 'react';
+import { useMemo, useContext } from 'react';
+import { AuthContext } from './AuthProvider';
 
 interface IdTokenClaims {
   roles?: string[];
@@ -23,14 +24,32 @@ export const useAuth = (): AuthState & {
   logout: () => Promise<void>;
   hasRole: (role: string) => boolean;
 } => {
-  const { instance, accounts, inProgress } = useMsal();
+  const { isAuthResolved } = useContext(AuthContext);
+
+  // Check if MSAL is available (not in configuration-needed state)
+  const msalAvailable = isAuthResolved;
+
+  let instance: any = null;
+  let accounts: any[] = [];
+  let inProgress: string = 'none';
+
+  if (msalAvailable) {
+    try {
+      const msalResult = useMsal();
+      instance = msalResult.instance;
+      accounts = msalResult.accounts;
+      inProgress = msalResult.inProgress;
+    } catch (error) {
+      // MSAL not available, continue with fallback
+    }
+  }
 
   const account = accounts[0];
-  const isAuthenticated = accounts.length > 0;
-  const isLoading = inProgress !== 'none';
+  const isAuthenticated = msalAvailable ? accounts.length > 0 : false;
+  const isLoading = msalAvailable ? inProgress !== 'none' : false;
 
   const user = useMemo((): UserInfo | null => {
-    if (!account) return null;
+    if (!msalAvailable || !account) return null;
 
     // Extract roles from ID token claims
     const idTokenClaims = account.idTokenClaims as IdTokenClaims;
@@ -41,9 +60,14 @@ export const useAuth = (): AuthState & {
       username: account.username || '',
       roles: Array.isArray(roles) ? roles : [],
     };
-  }, [account]);
+  }, [msalAvailable, account]);
 
   const logout = async (): Promise<void> => {
+    if (!msalAvailable || !instance) {
+      console.warn('Logout not available - authentication not configured');
+      return;
+    }
+
     try {
       await instance.logoutRedirect();
     } catch (error) {
@@ -54,6 +78,7 @@ export const useAuth = (): AuthState & {
   };
 
   const hasRole = (role: string): boolean => {
+    if (!msalAvailable) return false; // No roles when auth is not configured
     return user?.roles.includes(role) ?? false;
   };
 

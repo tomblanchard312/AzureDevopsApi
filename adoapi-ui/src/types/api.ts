@@ -497,3 +497,223 @@ export const PrStatusResponseSchema = z.object({
   statusUrl: z.string().optional(),
   errorMessage: z.string().optional(),
 });
+
+// Repository Intelligence types
+export interface RepoSnapshot {
+  id: string;
+  repoKey: string;
+  snapshotDate: string;
+  branch: string;
+  commitId: string;
+  fileCount: number;
+  totalLines: number;
+  metadata: Record<string, unknown>;
+}
+
+export interface RepositoryMemory {
+  id: string;
+  repoKey: string;
+  memoryType: string;
+  title: string;
+  content: string;
+  confidence: number;
+  source: string;
+  sourceType: string;
+  lastValidated: string;
+  isActive: boolean;
+  metadata: Record<string, unknown>;
+}
+
+export interface CodeInsight {
+  id: string;
+  repoKey: string;
+  fingerprint: string;
+  ruleId: string;
+  title: string;
+  description: string;
+  severity: 'Critical' | 'High' | 'Medium' | 'Low' | 'Info';
+  confidence: number;
+  filePath?: string;
+  lineStart?: number;
+  lineEnd?: number;
+  evidence: string;
+  status: 'Open' | 'AcceptedRisk' | 'Suppressed' | 'Fixed';
+  createdAt: string;
+  updatedAt?: string;
+  metadata: Record<string, unknown>;
+}
+
+export interface WorkItemLink {
+  id: string;
+  repoKey: string;
+  insightId: string;
+  workItemId?: string;
+  workItemType: string;
+  title: string;
+  description: string;
+  acceptanceCriteria: string;
+  whyNow?: string;
+  status: 'Proposed' | 'Approved' | 'Rejected' | 'Created';
+  confidence: number;
+  createdAt: string;
+  approved: boolean;
+  approvedBy?: string;
+  approvedAt?: string;
+  rejectedReason?: string;
+  azureDevOpsUrl?: string;
+}
+
+export interface AgentRun {
+  id: string;
+  repoKey: string;
+  runType: string;
+  model: string;
+  promptVersion: string;
+  policyVersion: string;
+  status: 'Running' | 'Completed' | 'Failed';
+  startedAt: string;
+  completedAt?: string;
+  inputSummary: string;
+  outputSummary: string;
+  errorMessage?: string;
+}
+
+export interface AgentDecision {
+  id: string;
+  agentRunId: string;
+  decisionType: string;
+  targetId: string;
+  confidence: number;
+  reason: string;
+  metadata: Record<string, unknown>;
+}
+
+export interface AutomationPolicy {
+  repoKey: string;
+  autoCreateEnabled: boolean;
+  allowedSeverities: ('Critical' | 'High')[];
+  minimumConfidence: number;
+  maxItemsPerDay: number;
+  requireHumanApproval: boolean;
+  allowOllamaAutoCreate: boolean;
+}
+
+export interface RepoOverview {
+  repoSummary: RepoSnapshot;
+  insightCounts: Record<string, number>;
+  workItemCounts: {
+    proposed: number;
+    created: number;
+  };
+  policyState: 'Disabled' | 'Restricted' | 'Enabled';
+}
+
+// Zod schemas for Repository Intelligence
+export const RepoSnapshotSchema = z.object({
+  id: z.string(),
+  repoKey: z.string(),
+  snapshotDate: z.string(),
+  branch: z.string(),
+  commitId: z.string(),
+  fileCount: z.number(),
+  totalLines: z.number(),
+  metadata: z.record(z.unknown()),
+});
+
+export const RepositoryMemorySchema = z.object({
+  id: z.string(),
+  repoKey: z.string(),
+  memoryType: z.string(),
+  title: z.string(),
+  content: z.string(),
+  confidence: z.number(),
+  source: z.string(),
+  sourceType: z.string(),
+  lastValidated: z.string(),
+  isActive: z.boolean(),
+  metadata: z.record(z.unknown()),
+});
+
+export const CodeInsightSchema = z.object({
+  id: z.string(),
+  repoKey: z.string(),
+  fingerprint: z.string(),
+  ruleId: z.string(),
+  title: z.string(),
+  description: z.string(),
+  severity: z.enum(['Critical', 'High', 'Medium', 'Low', 'Info']),
+  confidence: z.number(),
+  filePath: z.string().optional(),
+  lineStart: z.number().optional(),
+  lineEnd: z.number().optional(),
+  evidence: z.string(),
+  status: z.enum(['Open', 'AcceptedRisk', 'Suppressed', 'Fixed']),
+  createdAt: z.string(),
+  updatedAt: z.string().optional(),
+  metadata: z.record(z.unknown()),
+});
+
+export const WorkItemLinkSchema = z.object({
+  id: z.string(),
+  repoKey: z.string(),
+  insightId: z.string(),
+  workItemId: z.string().optional(),
+  workItemType: z.string(),
+  title: z.string(),
+  description: z.string(),
+  acceptanceCriteria: z.string(),
+  whyNow: z.string().optional(),
+  status: z.enum(['Proposed', 'Approved', 'Rejected', 'Created']),
+  confidence: z.number(),
+  createdAt: z.string(),
+  approved: z.boolean(),
+  approvedBy: z.string().optional(),
+  approvedAt: z.string().optional(),
+  rejectedReason: z.string().optional(),
+  azureDevOpsUrl: z.string().optional(),
+});
+
+export const AgentRunSchema = z.object({
+  id: z.string(),
+  repoKey: z.string(),
+  runType: z.string(),
+  model: z.string(),
+  promptVersion: z.string(),
+  policyVersion: z.string(),
+  status: z.enum(['Running', 'Completed', 'Failed']),
+  startedAt: z.string(),
+  completedAt: z.string().optional(),
+  inputSummary: z.string(),
+  outputSummary: z.string(),
+  errorMessage: z.string().optional(),
+});
+
+export const AgentDecisionSchema = z.object({
+  id: z.string(),
+  agentRunId: z.string(),
+  decisionType: z.string(),
+  targetId: z.string(),
+  confidence: z.number(),
+  reason: z.string(),
+  metadata: z.record(z.unknown()),
+});
+
+export const AutomationPolicySchema = z.object({
+  repoKey: z.string(),
+  autoCreateEnabled: z.boolean(),
+  allowedSeverities: z.array(z.enum(['Critical', 'High'])),
+  minimumConfidence: z.number(),
+  maxItemsPerDay: z.number(),
+  requireHumanApproval: z.boolean(),
+  allowOllamaAutoCreate: z.boolean(),
+});
+
+export const RepoOverviewSchema = z.object({
+  repoSummary: RepoSnapshotSchema,
+  insightCounts: z.record(z.number()),
+  workItemCounts: z.object({
+    proposed: z.number(),
+    created: z.number(),
+  }),
+  policyState: z.enum(['Disabled', 'Restricted', 'Enabled']),
+});

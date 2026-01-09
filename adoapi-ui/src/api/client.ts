@@ -16,6 +16,13 @@ import type {
   ThreadResolutionResponse,
   PrStatusRequest,
   PrStatusResponse,
+  RepoOverview,
+  RepositoryMemory,
+  CodeInsight,
+  WorkItemLink,
+  AgentRun,
+  AgentDecision,
+  AutomationPolicy,
   ApiError,
 } from '../types/api';
 import {
@@ -27,6 +34,13 @@ import {
   InlineCommentResponseSchema,
   ThreadResolutionResponseSchema,
   PrStatusResponseSchema,
+  RepoOverviewSchema,
+  RepositoryMemorySchema,
+  CodeInsightSchema,
+  WorkItemLinkSchema,
+  AgentRunSchema,
+  AgentDecisionSchema,
+  AutomationPolicySchema,
 } from '../types/api';
 import { useMsal } from '@azure/msal-react';
 import { InteractionRequiredAuthError } from '@azure/msal-browser';
@@ -277,6 +291,90 @@ export const api = {
   async postPrStatus(request: PrStatusRequest): Promise<PrStatusResponse> {
     const response = await apiClient.post('/api/security-advisor/pr/status', request);
     return validateResponse(response, PrStatusResponseSchema);
+  },
+
+  // Repository Intelligence methods
+  async getRepoOverview(repoKey: string): Promise<RepoOverview> {
+    const response = await apiClient.get(`/api/repo/${repoKey}/overview`);
+    return validateResponse(response, RepoOverviewSchema);
+  },
+
+  async getRepoMemories(repoKey: string): Promise<RepositoryMemory[]> {
+    const response = await apiClient.get(`/api/repo/${repoKey}/memory`);
+    return validateResponse(response, z.array(RepositoryMemorySchema));
+  },
+
+  async createRepoMemory(repoKey: string, memory: Omit<RepositoryMemory, 'id' | 'repoKey' | 'createdAt' | 'lastValidated'>): Promise<RepositoryMemory> {
+    const response = await apiClient.post(`/api/repo/${repoKey}/memory`, memory);
+    return validateResponse(response, RepositoryMemorySchema);
+  },
+
+  async updateRepoMemory(repoKey: string, id: string, memory: Partial<RepositoryMemory>): Promise<RepositoryMemory> {
+    const response = await apiClient.put(`/api/repo/${repoKey}/memory/${id}`, memory);
+    return validateResponse(response, RepositoryMemorySchema);
+  },
+
+  async deactivateRepoMemory(repoKey: string, id: string): Promise<void> {
+    await apiClient.delete(`/api/repo/${repoKey}/memory/${id}`);
+  },
+
+  async revalidateRepoMemory(repoKey: string, id: string): Promise<RepositoryMemory> {
+    const response = await apiClient.post(`/api/repo/${repoKey}/memory/${id}/revalidate`);
+    return validateResponse(response, RepositoryMemorySchema);
+  },
+
+  async getRepoInsights(repoKey: string, filters?: { severity?: string; status?: string; type?: string }): Promise<CodeInsight[]> {
+    const params = new URLSearchParams();
+    if (filters?.severity) params.append('severity', filters.severity);
+    if (filters?.status) params.append('status', filters.status);
+    if (filters?.type) params.append('type', filters.type);
+    const response = await apiClient.get(`/api/repo/${repoKey}/insights?${params}`);
+    return validateResponse(response, z.array(CodeInsightSchema));
+  },
+
+  async updateInsightStatus(repoKey: string, id: string, status: CodeInsight['status'], reason?: string): Promise<CodeInsight> {
+    const response = await apiClient.put(`/api/repo/${repoKey}/insights/${id}/status`, { status, reason });
+    return validateResponse(response, CodeInsightSchema);
+  },
+
+  async requestWorkItemProposal(repoKey: string, insightId: string): Promise<WorkItemLink> {
+    const response = await apiClient.post(`/api/repo/${repoKey}/insights/${insightId}/propose-work-item`);
+    return validateResponse(response, WorkItemLinkSchema);
+  },
+
+  async getWorkItemProposals(repoKey: string): Promise<WorkItemLink[]> {
+    const response = await apiClient.get(`/api/repo/${repoKey}/work-items`);
+    return validateResponse(response, z.array(WorkItemLinkSchema));
+  },
+
+  async approveWorkItemProposal(repoKey: string, id: string): Promise<WorkItemLink> {
+    const response = await apiClient.post(`/api/repo/${repoKey}/work-items/${id}/approve`);
+    return validateResponse(response, WorkItemLinkSchema);
+  },
+
+  async rejectWorkItemProposal(repoKey: string, id: string, reason: string): Promise<WorkItemLink> {
+    const response = await apiClient.post(`/api/repo/${repoKey}/work-items/${id}/reject`, { reason });
+    return validateResponse(response, WorkItemLinkSchema);
+  },
+
+  async getAutomationPolicy(repoKey: string): Promise<AutomationPolicy> {
+    const response = await apiClient.get(`/api/repo/${repoKey}/automation-policy`);
+    return validateResponse(response, AutomationPolicySchema);
+  },
+
+  async updateAutomationPolicy(repoKey: string, policy: AutomationPolicy): Promise<AutomationPolicy> {
+    const response = await apiClient.put(`/api/repo/${repoKey}/automation-policy`, policy);
+    return validateResponse(response, AutomationPolicySchema);
+  },
+
+  async getAgentRuns(repoKey: string): Promise<AgentRun[]> {
+    const response = await apiClient.get(`/api/repo/${repoKey}/agent-runs`);
+    return validateResponse(response, z.array(AgentRunSchema));
+  },
+
+  async getAgentRunDecisions(runId: string): Promise<AgentDecision[]> {
+    const response = await apiClient.get(`/api/agent-runs/${runId}/decisions`);
+    return validateResponse(response, z.array(AgentDecisionSchema));
   },
 };
 

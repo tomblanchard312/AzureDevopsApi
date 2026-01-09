@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { AppThemeProvider } from './theme';
 import { Layout } from './components';
 import { DocsPage, SettingsPage } from './pages';
+import { RepoOverviewPage, RepoMemoryPage, RepoInsightsPage, RepoWorkItemsPage, RepoAgentRunsPage, RepoAutomationPolicyPage } from './pages';
 import AuthProvider from './auth/AuthProvider';
 import './App.css';
 
@@ -15,6 +16,12 @@ function App() {
               <Route path="/" element={<Navigate to="/docs" replace />} />
               <Route path="/docs" element={<DocsPage />} />
               <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/repos/:repoKey/overview" element={<RepoOverviewPage />} />
+              <Route path="/repos/:repoKey/memory" element={<RepoMemoryPage />} />
+              <Route path="/repos/:repoKey/insights" element={<RepoInsightsPage />} />
+              <Route path="/repos/:repoKey/work-items" element={<RepoWorkItemsPage />} />
+              <Route path="/repos/:repoKey/agent-runs" element={<RepoAgentRunsPage />} />
+              <Route path="/repos/:repoKey/automation-policy" element={<RepoAutomationPolicyPage />} />
             </Routes>
           </Layout>
         </Router>

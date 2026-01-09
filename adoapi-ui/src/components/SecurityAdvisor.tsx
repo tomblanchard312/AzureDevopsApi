@@ -35,7 +35,7 @@ import {
   Comment as CommentIcon,
   Preview as PreviewIcon,
 } from '@mui/icons-material';
-import DiffViewer from './DiffViewer';
+import { DiffViewer } from './DiffViewer';
 import type {
   SecurityFinding,
   SecurityRecommendation,
