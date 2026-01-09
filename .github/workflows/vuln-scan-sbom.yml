@@ -45,7 +45,7 @@ jobs:
       - name: Generate CycloneDX SBOM for .NET
         run: |
           cd ADOApi
-          dotnet CycloneDX ADOApi.csproj --json --output ../sbom-dotnet.json
+          CycloneDX ADOApi.csproj --json --exclude-dev --output ../ --filename sbom-dotnet.json
           cd ..
 
       - name: Install React dependencies

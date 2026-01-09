@@ -6,6 +6,9 @@ import { RepoOverviewPage, RepoMemoryPage, RepoInsightsPage, RepoWorkItemsPage, 
 import AuthProvider from './auth/AuthProvider';
 import './App.css';
 
+// TODO: Import and mount RepoChatPanel here for repository-aware chat functionality
+// import { RepoChatPanel } from './features/repo-chat';
+
 function App() {
   return (
     <AuthProvider>
@@ -23,6 +26,8 @@ function App() {
               <Route path="/repos/:repoKey/agent-runs" element={<RepoAgentRunsPage />} />
               <Route path="/repos/:repoKey/automation-policy" element={<RepoAutomationPolicyPage />} />
             </Routes>
+            {/* TODO: Mount RepoChatPanel here to enable repository-aware chat across all pages */}
+            {/* <RepoChatPanel /> */}
           </Layout>
         </Router>
       </AppThemeProvider>

@@ -190,4 +190,50 @@ namespace ADOApi.Data
         public Dictionary<string, object> ConfidenceBreakdown { get; set; } = new();
         public Dictionary<string, object> InputsUsed { get; set; } = new();
     }
+
+    public class WorkItemProposalEntity
+    {
+        [Key]
+        public int Id { get; set; }
+
+        [Required]
+        [MaxLength(500)]
+        public string RepoKey { get; set; } = string.Empty;
+
+        [Required]
+        [MaxLength(100)]
+        public string ChatMessageId { get; set; } = string.Empty;
+
+        [Required]
+        [MaxLength(500)]
+        public string Title { get; set; } = string.Empty;
+
+        [Required]
+        [Column(TypeName = "TEXT")]
+        public string Description { get; set; } = string.Empty;
+
+        [Required]
+        [MaxLength(50)]
+        public string WorkItemType { get; set; } = string.Empty;
+
+        [Required]
+        public double Confidence { get; set; }
+
+        [Required]
+        [MaxLength(50)]
+        public string Source { get; set; } = string.Empty;
+
+        [Required]
+        [MaxLength(20)]
+        public string Status { get; set; } = string.Empty;
+
+        [Required]
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+        public Dictionary<string, object> Metadata { get; set; } = new();
+
+        // JSON storage for complex metadata
+        [Column(TypeName = "TEXT")]
+        public string MetadataJson { get; set; } = "{}";
+    }
 }

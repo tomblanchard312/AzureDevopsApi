@@ -12,18 +12,27 @@ namespace ADOApi.Services
     {
         private readonly ILogger<RiskAcceptanceExpiryService> _logger;
         private readonly IServiceProvider _serviceProvider;
+        private readonly IHostEnvironment _environment;
         private readonly TimeSpan _checkInterval = TimeSpan.FromHours(24); // Daily check
 
         public RiskAcceptanceExpiryService(
             ILogger<RiskAcceptanceExpiryService> logger,
-            IServiceProvider serviceProvider)
+            IServiceProvider serviceProvider,
+            IHostEnvironment environment)
         {
             _logger = logger;
             _serviceProvider = serviceProvider;
+            _environment = environment;
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
+            if (_environment.IsDevelopment())
+            {
+                _logger.LogInformation("Risk Acceptance Expiry Service skipped in development mode");
+                return;
+            }
+
             _logger.LogInformation("Risk Acceptance Expiry Service started");
 
             while (!stoppingToken.IsCancellationRequested)

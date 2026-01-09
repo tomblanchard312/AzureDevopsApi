@@ -22,6 +22,7 @@ namespace ADOApi.Data
         public DbSet<WorkItemLink> WorkItemLinks { get; set; } = null!;
         public DbSet<AgentRun> AgentRuns { get; set; } = null!;
         public DbSet<AgentDecision> AgentDecisions { get; set; } = null!;
+        public DbSet<WorkItemProposalEntity> WorkItemProposals { get; set; } = null!;
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -268,6 +269,27 @@ namespace ADOApi.Data
                     .WithMany(r => r.Decisions)
                     .HasForeignKey(e => e.RunId)
                     .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            // WorkItemProposal configuration
+            modelBuilder.Entity<WorkItemProposalEntity>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.Id).ValueGeneratedOnAdd();
+                entity.Property(e => e.RepoKey).HasMaxLength(500).IsRequired();
+                entity.Property(e => e.ChatMessageId).HasMaxLength(100).IsRequired();
+                entity.Property(e => e.Title).HasMaxLength(500).IsRequired();
+                entity.Property(e => e.Description).HasColumnType("TEXT").IsRequired();
+                entity.Property(e => e.WorkItemType).HasMaxLength(50).IsRequired();
+                entity.Property(e => e.Confidence).IsRequired();
+                entity.Property(e => e.Source).HasMaxLength(50).IsRequired();
+                entity.Property(e => e.Status).HasMaxLength(20).IsRequired();
+                entity.Property(e => e.CreatedAt).IsRequired();
+
+                entity.HasIndex(e => e.RepoKey);
+                entity.HasIndex(e => new { e.RepoKey, e.ChatMessageId });
+                entity.HasIndex(e => e.Status);
+                entity.HasIndex(e => e.CreatedAt);
             });
         }
     }

@@ -600,7 +600,7 @@ export interface AutomationPolicy {
 
 export interface RepoOverview {
   repoSummary: RepoSnapshot;
-  insightCounts: Record<string, number>;
+  insightCounts: Record<number, number>;
   workItemCounts: {
     proposed: number;
     created: number;
@@ -617,7 +617,7 @@ export const RepoSnapshotSchema = z.object({
   commitId: z.string(),
   fileCount: z.number(),
   totalLines: z.number(),
-  metadata: z.record(z.unknown()),
+  metadata: z.record(z.string(), z.unknown()),
 });
 
 export const RepositoryMemorySchema = z.object({
@@ -631,7 +631,7 @@ export const RepositoryMemorySchema = z.object({
   sourceType: z.string(),
   lastValidated: z.string(),
   isActive: z.boolean(),
-  metadata: z.record(z.unknown()),
+  metadata: z.record(z.string(), z.unknown()),
 });
 
 export const CodeInsightSchema = z.object({
@@ -650,7 +650,7 @@ export const CodeInsightSchema = z.object({
   status: z.enum(['Open', 'AcceptedRisk', 'Suppressed', 'Fixed']),
   createdAt: z.string(),
   updatedAt: z.string().optional(),
-  metadata: z.record(z.unknown()),
+  metadata: z.record(z.string(), z.unknown()),
 });
 
 export const WorkItemLinkSchema = z.object({
@@ -695,7 +695,7 @@ export const AgentDecisionSchema = z.object({
   targetId: z.string(),
   confidence: z.number(),
   reason: z.string(),
-  metadata: z.record(z.unknown()),
+  metadata: z.record(z.string(), z.unknown()),
 });
 
 export const AutomationPolicySchema = z.object({
@@ -710,7 +710,7 @@ export const AutomationPolicySchema = z.object({
 
 export const RepoOverviewSchema = z.object({
   repoSummary: RepoSnapshotSchema,
-  insightCounts: z.record(z.number()),
+  insightCounts: z.record(z.coerce.number(), z.number()),
   workItemCounts: z.object({
     proposed: z.number(),
     created: z.number(),

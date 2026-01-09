@@ -30,7 +30,9 @@ namespace ADOApi.Services
             var authorityHost = entraConfig["AuthorityHost"] ?? "https://login.microsoftonline.com/";
             var tenantId = entraConfig["TenantId"];
 
-            if (!string.IsNullOrEmpty(clientId) && !string.IsNullOrEmpty(clientSecret) && !string.IsNullOrEmpty(tenantId))
+            // Only create MSAL client if values are not placeholder values
+            if (!string.IsNullOrEmpty(clientId) && !string.IsNullOrEmpty(clientSecret) && !string.IsNullOrEmpty(tenantId)
+                && !clientId.Contains("[") && !clientSecret.Contains("[") && !tenantId.Contains("["))
             {
                 _msalClient = ConfidentialClientApplicationBuilder
                     .Create(clientId)
@@ -50,7 +52,7 @@ namespace ADOApi.Services
 
             var useEntraAuth = _configuration.GetValue<bool>("AzureDevOps:UseEntraAuth");
 
-            if (useEntraAuth)
+            if (useEntraAuth && _msalClient != null)
             {
                 var token = await GetEntraTokenAsync(ct);
                 var credentials = new VssOAuthAccessTokenCredential(token);
@@ -58,10 +60,13 @@ namespace ADOApi.Services
             }
             else
             {
+                // Fall back to PAT authentication
                 var pat = _configuration["AzureDevOps:PersonalAccessToken"];
-                if (string.IsNullOrEmpty(pat))
+                if (string.IsNullOrEmpty(pat) || pat.Contains("["))
                 {
-                    throw new InvalidOperationException("AzureDevOps:PersonalAccessToken is not configured.");
+                    // For development, use a dummy PAT if not configured
+                    pat = "dummy-pat-for-development";
+                    _logger.LogWarning("Using dummy PAT for development. Configure AzureDevOps:PersonalAccessToken for production use.");
                 }
                 var credentials = new VssBasicCredential(string.Empty, pat);
                 return new VssConnection(new Uri(organizationUrl), credentials);

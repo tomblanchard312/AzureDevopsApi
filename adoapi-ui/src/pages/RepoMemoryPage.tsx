@@ -127,6 +127,8 @@ const RepoMemoryPage: React.FC = () => {
     confidence: 0.5,
     source: '',
     sourceType: '',
+    isActive: true,
+    metadata: {},
   });
 
   const loadMemories = useCallback(async () => {
@@ -155,6 +157,8 @@ const RepoMemoryPage: React.FC = () => {
       confidence: 0.5,
       source: '',
       sourceType: '',
+      isActive: true,
+      metadata: {},
     });
     setDialogOpen(true);
   };
@@ -168,6 +172,8 @@ const RepoMemoryPage: React.FC = () => {
       confidence: memory.confidence,
       source: memory.source,
       sourceType: memory.sourceType,
+      isActive: memory.isActive,
+      metadata: memory.metadata,
     });
     setDialogOpen(true);
   };

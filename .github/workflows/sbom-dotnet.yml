@@ -34,10 +34,11 @@ jobs:
       - name: Generate .NET SBOM
         run: |
           mkdir -p sbom
-          cyclonedx dotnet \
+          CycloneDX ADOApi.sln \
             --json \
             --exclude-dev \
-            --output sbom/sbom.dotnet.cdx.json
+            --output sbom \
+            --filename sbom.dotnet.cdx.json
 
       - name: Upload SBOM artifact
         uses: actions/upload-artifact@v4

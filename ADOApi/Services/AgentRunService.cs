@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.EntityFrameworkCore;
+using System.Text.Json;
 
 namespace ADOApi.Services
 {
@@ -55,6 +56,51 @@ namespace ADOApi.Services
             await _context.SaveChangesAsync();
 
             _logger.LogInformation("Completed agent run {RunId} with status {Status}", runId, status);
+        }
+
+        public async Task<AgentRun> StartChatRunAsync(string repoKey, string modelProvider, string promptVersion, string policyVersion, string mode, int fileCount, string? correlationId = null)
+        {
+            var inputSummary = new { mode, fileCount };
+            var inputSummaryJson = JsonSerializer.Serialize(inputSummary);
+
+            var run = new AgentRun
+            {
+                RepoKey = repoKey,
+                RunType = "Chat",
+                ModelProvider = modelProvider,
+                ModelName = string.Empty, // Not applicable for chat runs
+                PromptVersion = promptVersion,
+                PolicyVersion = policyVersion,
+                CorrelationId = correlationId,
+                StartedUtc = DateTime.UtcNow,
+                Status = "Started",
+                InputSummaryJson = inputSummaryJson
+            };
+
+            _context.AgentRuns.Add(run);
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation("Started chat agent run {RunId} for mode {Mode} on {RepoKey}", run.Id, mode, repoKey);
+            return run;
+        }
+
+        public async Task CompleteChatRunAsync(Guid runId, string status, int proposalCount, string? error = null)
+        {
+            var run = await _context.AgentRuns.FindAsync(runId);
+            if (run == null)
+                throw new KeyNotFoundException($"Agent run {runId} not found");
+
+            var outputSummary = new { proposalCount };
+            var outputSummaryJson = JsonSerializer.Serialize(outputSummary);
+
+            run.Status = status;
+            run.CompletedUtc = DateTime.UtcNow;
+            run.OutputSummaryJson = outputSummaryJson;
+            run.Error = error;
+
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation("Completed chat agent run {RunId} with status {Status}", runId, status);
         }
 
         public async Task<AgentDecision> RecordDecisionAsync(Guid runId, string repoKey, string decisionType, string targetType, string targetId, string decision, string justification, double confidence, string createdBy)

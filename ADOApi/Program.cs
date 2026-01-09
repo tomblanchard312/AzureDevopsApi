@@ -57,29 +57,44 @@ if (!string.IsNullOrEmpty(kvUri))
 builder.Services.AddMemoryCache();
 builder.Services.AddHttpClient();
 
-// Configure Microsoft Identity Web (Azure AD) JWT Bearer authentication
-builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddMicrosoftIdentityWebApi(builder.Configuration.GetSection("AzureAd"));
-
-// Configure role claim mapping
-builder.Services.Configure<JwtBearerOptions>(
-    JwtBearerDefaults.AuthenticationScheme, options =>
-    {
-        options.TokenValidationParameters.RoleClaimType = "roles";
-    });
-
-// Authorization: require auth by default and add role-based policies
-builder.Services.AddAuthorization(options =>
+// Configure authentication conditionally based on environment
+if (builder.Environment.IsDevelopment())
 {
-    // Require authenticated user for all endpoints unless [AllowAnonymous]
-    options.FallbackPolicy = new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder()
-        .RequireAuthenticatedUser()
-        .Build();
+    // In development, allow anonymous access for easier testing
+    builder.Services.AddAuthentication();
+    builder.Services.AddAuthorization(options =>
+    {
+        options.AddPolicy("ADO.ReadOnly", policy => policy.RequireAssertion(_ => true));
+        options.AddPolicy("ADO.Contributor", policy => policy.RequireAssertion(_ => true));
+        options.AddPolicy("ADO.Admin", policy => policy.RequireAssertion(_ => true));
+    });
+}
+else
+{
+    // Configure Microsoft Identity Web (Azure AD) JWT Bearer authentication
+    builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+        .AddMicrosoftIdentityWebApi(builder.Configuration.GetSection("AzureAd"));
 
-    options.AddPolicy("ADO.ReadOnly", policy => policy.RequireRole("ADO.ReadOnly"));
-    options.AddPolicy("ADO.Contributor", policy => policy.RequireRole("ADO.Contributor"));
-    options.AddPolicy("ADO.Admin", policy => policy.RequireRole("ADO.Admin"));
-});
+    // Configure role claim mapping
+    builder.Services.Configure<JwtBearerOptions>(
+        JwtBearerDefaults.AuthenticationScheme, options =>
+        {
+            options.TokenValidationParameters.RoleClaimType = "roles";
+        });
+
+    // Authorization: require auth by default and add role-based policies
+    builder.Services.AddAuthorization(options =>
+    {
+        // Require authenticated user for all endpoints unless [AllowAnonymous]
+        options.FallbackPolicy = new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder()
+            .RequireAuthenticatedUser()
+            .Build();
+
+        options.AddPolicy("ADO.ReadOnly", policy => policy.RequireRole("ADO.ReadOnly"));
+        options.AddPolicy("ADO.Contributor", policy => policy.RequireRole("ADO.Contributor"));
+        options.AddPolicy("ADO.Admin", policy => policy.RequireRole("ADO.Admin"));
+    });
+}
 
 builder.Services.AddControllers();
 
@@ -239,6 +254,10 @@ builder.Services.AddHostedService<RiskAcceptanceExpiryService>();
 builder.Services.AddSingleton<ResiliencePolicies>();
 // Semantic chat adapter
 builder.Services.AddScoped<ADOApi.Interfaces.ISemanticChatService, ADOApi.Services.SemanticChatService>();
+
+// Register chat services
+builder.Services.AddScoped<ADOApi.Services.Chat.RepoChatAgentService>();
+builder.Services.AddScoped<ADOApi.Services.Chat.RepoChatContextBuilder>();
 
 var app = builder.Build();
 

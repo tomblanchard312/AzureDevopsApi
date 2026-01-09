@@ -41,6 +41,8 @@ namespace ADOApi.Interfaces
     {
         Task<AgentRun> StartRunAsync(string repoKey, string runType, string modelProvider, string modelName, string promptVersion, string policyVersion, string? correlationId = null);
         Task CompleteRunAsync(Guid runId, string status, string? outputSummaryJson = null, string? error = null);
+        Task<AgentRun> StartChatRunAsync(string repoKey, string modelProvider, string promptVersion, string policyVersion, string mode, int fileCount, string? correlationId = null);
+        Task CompleteChatRunAsync(Guid runId, string status, int proposalCount, string? error = null);
         Task<AgentDecision> RecordDecisionAsync(Guid runId, string repoKey, string decisionType, string targetType, string targetId, string decision, string justification, double confidence, string createdBy);
         Task<IEnumerable<AgentRun>> GetRunsAsync(string repoKey, string? runType = null, string? status = null, DateTime? since = null);
         Task<AgentRun?> GetRunAsync(Guid runId);

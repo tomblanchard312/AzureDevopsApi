@@ -153,6 +153,10 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
           {children}
         </Container>
       </Box>
+
+      {/* TODO: Mount RepoChatPanel here for global repository-aware chat functionality */}
+      {/* This should be positioned fixed and available across all repository pages */}
+      {/* <RepoChatPanel /> */}
     </Box>
   );
 };

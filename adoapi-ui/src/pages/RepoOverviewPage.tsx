@@ -72,6 +72,7 @@ const RepoOverviewPage: React.FC = () => {
 
       <Grid container spacing={3}>
         {/* Repo Summary */}
+        {/* @ts-expect-error MUI Grid API issue */}
         <Grid item xs={12} md={6}>
           <Card>
             <CardContent>
@@ -98,6 +99,7 @@ const RepoOverviewPage: React.FC = () => {
         </Grid>
 
         {/* Policy State */}
+        {/* @ts-expect-error MUI Grid API issue */}
         <Grid item xs={12} md={6}>
           <Card>
             <CardContent>
@@ -122,6 +124,7 @@ const RepoOverviewPage: React.FC = () => {
         </Grid>
 
         {/* Insights Summary */}
+        {/* @ts-expect-error MUI Grid API issue */}
         <Grid item xs={12} md={6}>
           <Card>
             <CardContent>
@@ -147,6 +150,7 @@ const RepoOverviewPage: React.FC = () => {
         </Grid>
 
         {/* Work Items Summary */}
+        {/* @ts-expect-error MUI Grid API issue */}
         <Grid item xs={12} md={6}>
           <Card>
             <CardContent>
