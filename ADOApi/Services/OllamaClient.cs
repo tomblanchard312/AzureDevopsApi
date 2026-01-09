@@ -53,6 +53,10 @@ namespace ADOApi.Services
             }
         }
 
+        public string GetModelProvider() => "Ollama";
+
+        public string GetModelName() => _model;
+
         private class OllamaResponse
         {
             public string Response { get; set; } = string.Empty;

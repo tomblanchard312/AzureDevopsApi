@@ -55,7 +55,7 @@ namespace ADOApi.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting repositories for project {Project}", project);
+                _logger.LogError(ex, "Error getting repositories for project {Project}", SanitizeForLog(project));
                 return StatusCode(500, $"Error: {ex.Message}");
             }
         }
@@ -70,7 +70,7 @@ namespace ADOApi.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting file content for {Path} in repository {RepositoryId}", path, repositoryId);
+                _logger.LogError(ex, "Error getting file content for {Path} in repository {RepositoryId}", SanitizeForLog(path), SanitizeForLog(repositoryId));
                 return StatusCode(500, $"Error: {ex.Message}");
             }
         }
@@ -85,7 +85,7 @@ namespace ADOApi.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting directory contents for {Path} in repository {RepositoryId}", path, repositoryId);
+                _logger.LogError(ex, "Error getting directory contents for {Path} in repository {RepositoryId}", SanitizeForLog(path), SanitizeForLog(repositoryId));
                 return StatusCode(500, $"Error: {ex.Message}");
             }
         }
@@ -100,7 +100,7 @@ namespace ADOApi.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting commit {CommitId} in repository {RepositoryId}", commitId, repositoryId);
+                _logger.LogError(ex, "Error getting commit {CommitId} in repository {RepositoryId}", SanitizeForLog(commitId), SanitizeForLog(repositoryId));
                 return StatusCode(500, $"Error: {ex.Message}");
             }
         }
@@ -115,7 +115,7 @@ namespace ADOApi.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting commits for branch {Branch} in repository {RepositoryId}", branch, repositoryId);
+                _logger.LogError(ex, "Error getting commits for branch {Branch} in repository {RepositoryId}", SanitizeForLog(branch), SanitizeForLog(repositoryId));
                 return StatusCode(500, $"Error: {ex.Message}");
             }
         }
@@ -130,7 +130,7 @@ namespace ADOApi.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting branch {BranchName} in repository {RepositoryId}", branchName, repositoryId);
+                _logger.LogError(ex, "Error getting branch {BranchName} in repository {RepositoryId}", SanitizeForLog(branchName), SanitizeForLog(repositoryId));
                 return StatusCode(500, $"Error: {ex.Message}");
             }
         }
@@ -158,7 +158,7 @@ namespace ADOApi.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting branches for repository {RepositoryId}", repositoryId);
+                _logger.LogError(ex, "Error getting branches for repository {RepositoryId}", SanitizeForLog(repositoryId));
                 return StatusCode(500, $"Error: {ex.Message}");
             }
         }
@@ -195,7 +195,7 @@ namespace ADOApi.Controllers
                 evt.ErrorMessage = ex.Message;
                 await _auditLogger.AuditAsync(evt);
                 _logger.LogError(ex, "Error creating branch {NewBranchName} from {SourceBranch} in repository {RepositoryId}", 
-                    request.NewBranchName, request.SourceBranch, repositoryId);
+                    SanitizeForLog(request.NewBranchName), SanitizeForLog(request.SourceBranch), SanitizeForLog(repositoryId));
                 return StatusCode(500, $"Error: {ex.Message}");
             }
         }
@@ -231,7 +231,7 @@ namespace ADOApi.Controllers
                 evt.ErrorMessage = ex.Message;
                 await _auditLogger.AuditAsync(evt);
                 _logger.LogError(ex, "Error creating file {Path} in branch {Branch} of repository {RepositoryId}", 
-                    request.Path, request.Branch, repositoryId);
+                    SanitizeForLog(request.Path), SanitizeForLog(request.Branch), SanitizeForLog(repositoryId));
                 return StatusCode(500, $"Error: {ex.Message}");
             }
         }
@@ -274,7 +274,7 @@ namespace ADOApi.Controllers
                 evt.Success = false;
                 evt.ErrorMessage = ex.Message;
                 await _auditLogger.AuditAsync(evt);
-                _logger.LogWarning(ex, "Conflict updating file {Path} in branch {Branch} of repository {RepositoryId}", request.Path, request.Branch, repositoryId);
+                _logger.LogWarning(ex, "Conflict updating file {Path} in branch {Branch} of repository {RepositoryId}", SanitizeForLog(request.Path), SanitizeForLog(request.Branch), SanitizeForLog(repositoryId));
                 return Conflict(new { error = "Conflict", details = ex.Message });
             }
             catch (Exception ex)
@@ -283,7 +283,7 @@ namespace ADOApi.Controllers
                 evt.ErrorMessage = ex.Message;
                 await _auditLogger.AuditAsync(evt);
                 _logger.LogError(ex, "Error updating file {Path} in branch {Branch} of repository {RepositoryId}", 
-                    request.Path, request.Branch, repositoryId);
+                    SanitizeForLog(request.Path), SanitizeForLog(request.Branch), SanitizeForLog(repositoryId));
                 return StatusCode(500, $"Error: {ex.Message}");
             }
         }
@@ -326,7 +326,7 @@ namespace ADOApi.Controllers
                 evt.Success = false;
                 evt.ErrorMessage = ex.Message;
                 await _auditLogger.AuditAsync(evt);
-                _logger.LogWarning(ex, "Conflict deleting file {Path} in branch {Branch} of repository {RepositoryId}", request.Path, request.Branch, repositoryId);
+                _logger.LogWarning(ex, "Conflict deleting file {Path} in branch {Branch} of repository {RepositoryId}", SanitizeForLog(request.Path), SanitizeForLog(request.Branch), SanitizeForLog(repositoryId));
                 return Conflict(new { error = "Conflict", details = ex.Message });
             }
             catch (Exception ex)
@@ -334,7 +334,7 @@ namespace ADOApi.Controllers
                 evt.Success = false;
                 evt.ErrorMessage = ex.Message;
                 await _auditLogger.AuditAsync(evt);
-                _logger.LogError(ex, "Error deleting file in repository {RepositoryId}", repositoryId);
+                _logger.LogError(ex, "Error deleting file in repository {RepositoryId}", SanitizeForLog(repositoryId));
                 return StatusCode(500, $"Error: {ex.Message}");
             }
         }
@@ -349,7 +349,7 @@ namespace ADOApi.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting repository structure for repository {RepositoryId}", repositoryId);
+                _logger.LogError(ex, "Error getting repository structure for repository {RepositoryId}", SanitizeForLog(repositoryId));
                 return StatusCode(500, $"Error: {ex.Message}");
             }
         }

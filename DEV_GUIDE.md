@@ -12,7 +12,7 @@ This guide helps contributors understand the codebase and contribute safely.
   - **Utilities/**: Middleware and helpers (e.g., `RateLimitingMiddleware`).
   - **Exceptions/**: Custom errors (e.g., `AzureDevOpsApiException`).
   - **Program.cs**: DI setup and startup.
-- **ADOApi.UI/**: Optional Blazor WASM frontend.
+- **adoapi-ui/**: Optional React frontend.
 - **ADOApi.Tests/**: xUnit tests with `WebApplicationFactory` for integration.
 
 ## Coding Conventions

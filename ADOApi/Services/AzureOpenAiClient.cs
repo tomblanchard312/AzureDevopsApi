@@ -11,20 +11,21 @@ namespace ADOApi.Services
     public class AzureOpenAiClient : ILLMClient
     {
         private readonly Kernel _kernel;
+        private readonly string _deployment;
 
         public AzureOpenAiClient(IConfiguration configuration)
         {
             var endpoint = configuration["OpenAI:Endpoint"];
             var apiKey = configuration["OpenAI:ApiKey"];
-            var deployment = configuration["OpenAI:Deployment"];
+            _deployment = configuration["OpenAI:Deployment"] ?? string.Empty;
 
-            if (string.IsNullOrEmpty(endpoint) || string.IsNullOrEmpty(apiKey) || string.IsNullOrEmpty(deployment))
+            if (string.IsNullOrEmpty(endpoint) || string.IsNullOrEmpty(apiKey) || string.IsNullOrEmpty(_deployment))
             {
                 throw new InvalidOperationException("Azure OpenAI configuration is incomplete.");
             }
 
             _kernel = Kernel.CreateBuilder()
-                .AddAzureOpenAIChatCompletion(deployment, endpoint, apiKey)
+                .AddAzureOpenAIChatCompletion(_deployment, endpoint, apiKey)
                 .Build();
         }
 
@@ -43,5 +44,9 @@ namespace ADOApi.Services
             var result = await chatCompletionService.GetChatMessageContentAsync(history, cancellationToken: ct);
             return result.Content ?? string.Empty;
         }
+
+        public string GetModelProvider() => "AzureOpenAI";
+
+        public string GetModelName() => _deployment;
     }
 }

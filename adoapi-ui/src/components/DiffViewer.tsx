@@ -1,16 +1,26 @@
 import React from 'react';
 import ReactDiffViewer, { DiffMethod } from 'react-diff-viewer-continued';
-import { Box, Paper, IconButton, Tooltip, Typography } from '@mui/material';
-import { ContentCopy as CopyIcon } from '@mui/icons-material';
+import { Box, Paper, IconButton, Tooltip, Typography, Chip } from '@mui/material';
+import { ContentCopy as CopyIcon, Code as CodeIcon } from '@mui/icons-material';
 import { useTheme } from '@mui/material/styles';
 
 interface DiffViewerProps {
   original: string;
   modified: string;
   title?: string;
+  language?: string;
+  filePath?: string;
+  readOnly?: boolean;
 }
 
-const DiffViewer: React.FC<DiffViewerProps> = ({ original, modified, title }) => {
+const DiffViewer: React.FC<DiffViewerProps> = ({
+  original,
+  modified,
+  title,
+  language = 'text',
+  filePath,
+  readOnly = true
+}) => {
   const theme = useTheme();
 
   const handleCopyDiff = async () => {
@@ -42,127 +52,218 @@ const DiffViewer: React.FC<DiffViewerProps> = ({ original, modified, title }) =>
     }
   };
 
-  // Custom styles for the diff viewer to match MUI theme
+  // Enhanced styles for GitHub-style diff viewer
   const diffViewerStyles = {
     variables: {
       light: {
         diffViewerBackground: theme.palette.background.paper,
         diffViewerColor: theme.palette.text.primary,
-        addedBackground: theme.palette.success.main + '20', // 20% opacity
-        addedColor: theme.palette.success.main,
-        removedBackground: theme.palette.error.main + '20',
-        removedColor: theme.palette.error.main,
-        wordAddedBackground: theme.palette.success.main + '40',
-        wordRemovedBackground: theme.palette.error.main + '40',
-        addedGutterBackground: theme.palette.success.main + '30',
-        removedGutterBackground: theme.palette.error.main + '30',
-        gutterBackground: theme.palette.background.default,
-        gutterBackgroundDark: theme.palette.background.default,
-        highlightBackground: theme.palette.warning.main + '20',
-        highlightGutterBackground: theme.palette.warning.main + '30',
-        codeFoldGutterBackground: theme.palette.background.default,
-        codeFoldBackground: theme.palette.background.default,
-        emptyLineBackground: theme.palette.background.default,
-        gutterColor: theme.palette.text.secondary,
-        addedGutterColor: theme.palette.success.main,
-        removedGutterColor: theme.palette.error.main,
-        codeFoldContentColor: theme.palette.text.secondary,
-        diffViewerTitleBackground: theme.palette.background.default,
-        diffViewerTitleColor: theme.palette.text.primary,
-        diffViewerTitleBorderColor: theme.palette.divider,
+        addedBackground: '#e6ffed',
+        addedColor: '#24292e',
+        removedBackground: '#ffeef0',
+        removedColor: '#24292e',
+        wordAddedBackground: '#acf2bd',
+        wordRemovedBackground: '#fdb8c0',
+        addedGutterBackground: '#cdffd8',
+        removedGutterBackground: '#ffdce0',
+        gutterBackground: '#f6f8fa',
+        gutterBackgroundDark: '#f6f8fa',
+        highlightBackground: '#fff5b4',
+        highlightGutterBackground: '#ffea7f',
+        codeFoldGutterBackground: '#f6f8fa',
+        codeFoldBackground: '#f6f8fa',
+        emptyLineBackground: '#fafbfc',
+        gutterColor: '#586069',
+        addedGutterColor: '#28a745',
+        removedGutterColor: '#cb2431',
+        codeFoldContentColor: '#586069',
+        diffViewerTitleBackground: '#f6f8fa',
+        diffViewerTitleColor: '#24292e',
+        diffViewerTitleBorderColor: '#e1e4e8',
       },
       dark: {
         diffViewerBackground: theme.palette.background.paper,
         diffViewerColor: theme.palette.text.primary,
-        addedBackground: theme.palette.success.main + '20',
-        addedColor: theme.palette.success.main,
-        removedBackground: theme.palette.error.main + '20',
-        removedColor: theme.palette.error.main,
-        wordAddedBackground: theme.palette.success.main + '40',
-        wordRemovedBackground: theme.palette.error.main + '40',
-        addedGutterBackground: theme.palette.success.main + '30',
-        removedGutterBackground: theme.palette.error.main + '30',
-        gutterBackground: theme.palette.background.default,
-        gutterBackgroundDark: theme.palette.background.default,
-        highlightBackground: theme.palette.warning.main + '20',
-        highlightGutterBackground: theme.palette.warning.main + '30',
-        codeFoldGutterBackground: theme.palette.background.default,
-        codeFoldBackground: theme.palette.background.default,
-        emptyLineBackground: theme.palette.background.default,
-        gutterColor: theme.palette.text.secondary,
-        addedGutterColor: theme.palette.success.main,
-        removedGutterColor: theme.palette.error.main,
-        codeFoldContentColor: theme.palette.text.secondary,
-        diffViewerTitleBackground: theme.palette.background.default,
-        diffViewerTitleColor: theme.palette.text.primary,
-        diffViewerTitleBorderColor: theme.palette.divider,
+        addedBackground: '#0e4429',
+        addedColor: '#e6edf3',
+        removedBackground: '#67060c',
+        removedColor: '#e6edf3',
+        wordAddedBackground: '#055d20',
+        wordRemovedBackground: '#a01115',
+        addedGutterBackground: '#033a16',
+        removedGutterBackground: '#490202',
+        gutterBackground: '#161b22',
+        gutterBackgroundDark: '#161b22',
+        highlightBackground: '#bb8009',
+        highlightGutterBackground: '#8a4600',
+        codeFoldGutterBackground: '#161b22',
+        codeFoldBackground: '#161b22',
+        emptyLineBackground: '#0d1117',
+        gutterColor: '#8b949e',
+        addedGutterColor: '#56d364',
+        removedGutterColor: '#f85149',
+        codeFoldContentColor: '#8b949e',
+        diffViewerTitleBackground: '#161b22',
+        diffViewerTitleColor: '#e6edf3',
+        diffViewerTitleBorderColor: '#30363d',
       },
     },
     line: {
-      fontFamily: 'Monaco, Menlo, "Ubuntu Mono", monospace',
+      fontFamily: '"SFMono-Regular", "Monaco", "Inconsolata", "Roboto Mono", monospace',
       fontSize: '14px',
-      lineHeight: '1.4',
+      lineHeight: '1.45',
+      padding: '0 12px',
     },
     gutter: {
-      fontFamily: 'Monaco, Menlo, "Ubuntu Mono", monospace',
+      fontFamily: '"SFMono-Regular", "Monaco", "Inconsolata", "Roboto Mono", monospace',
       fontSize: '14px',
+      padding: '0 8px',
     },
     codeFold: {
-      fontFamily: 'Monaco, Menlo, "Ubuntu Mono", monospace',
+      fontFamily: '"SFMono-Regular", "Monaco", "Inconsolata", "Roboto Mono", monospace',
     },
+    wordDiff: {
+      padding: '2px 0',
+    },
+  };
+
+  const getLanguageLabel = (lang: string) => {
+    const languageMap: Record<string, string> = {
+      javascript: 'JavaScript',
+      typescript: 'TypeScript',
+      python: 'Python',
+      java: 'Java',
+      csharp: 'C#',
+      cpp: 'C++',
+      go: 'Go',
+      rust: 'Rust',
+      php: 'PHP',
+      ruby: 'Ruby',
+      swift: 'Swift',
+      kotlin: 'Kotlin',
+      scala: 'Scala',
+      sql: 'SQL',
+      html: 'HTML',
+      css: 'CSS',
+      json: 'JSON',
+      xml: 'XML',
+      yaml: 'YAML',
+      markdown: 'Markdown',
+    };
+    return languageMap[lang.toLowerCase()] || lang;
   };
 
   return (
     <Paper
       elevation={1}
       sx={{
-        p: 2,
         backgroundColor: theme.palette.background.paper,
         border: `1px solid ${theme.palette.divider}`,
+        borderRadius: 1,
+        overflow: 'hidden',
       }}
     >
-      {(title || true) && ( // Always show header for copy button
-        <Box
-          sx={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            mb: 2,
-            pb: 1,
-            borderBottom: `1px solid ${theme.palette.divider}`,
-          }}
-        >
+      {/* Header */}
+      <Box
+        sx={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          p: 2,
+          pb: 1,
+          borderBottom: `1px solid ${theme.palette.divider}`,
+          backgroundColor: theme.palette.mode === 'dark' ? '#161b22' : '#f6f8fa',
+        }}
+      >
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <CodeIcon sx={{ color: theme.palette.text.secondary }} />
           <Typography variant="h6" component="h3">
-            {title || 'Diff Viewer'}
+            {title || 'Code Changes'}
           </Typography>
+          {filePath && (
+            <Chip
+              label={filePath}
+              size="small"
+              variant="outlined"
+              sx={{ ml: 1 }}
+            />
+          )}
+          {language && language !== 'text' && (
+            <Chip
+              label={getLanguageLabel(language)}
+              size="small"
+              color="primary"
+              variant="outlined"
+            />
+          )}
+        </Box>
+
+        <Box sx={{ display: 'flex', gap: 1 }}>
           <Tooltip title="Copy diff to clipboard">
             <IconButton onClick={handleCopyDiff} size="small">
               <CopyIcon />
             </IconButton>
           </Tooltip>
         </Box>
-      )}
+      </Box>
 
+      {/* Diff Content */}
       <Box
         sx={{
-          fontFamily: 'Monaco, Menlo, "Ubuntu Mono", monospace',
+          fontFamily: '"SFMono-Regular", "Monaco", "Inconsolata", "Roboto Mono", monospace',
           '& .diff-viewer': {
-            borderRadius: theme.shape.borderRadius,
+            borderRadius: 0,
             overflow: 'hidden',
+          },
+          '& .diff-viewer .gutter': {
+            backgroundColor: theme.palette.mode === 'dark' ? '#161b22' : '#f6f8fa',
+          },
+          '& .diff-viewer .line': {
+            transition: 'background-color 0.2s ease',
           },
         }}
       >
         <ReactDiffViewer
           oldValue={original}
           newValue={modified}
-          splitView={false} // Unified view
+          splitView={false} // Unified view like GitHub
           compareMethod={DiffMethod.LINES}
           styles={diffViewerStyles}
           useDarkTheme={theme.palette.mode === 'dark'}
           disableWordDiff={false}
           hideLineNumbers={false}
-          showDiffOnly={false}
+          showDiffOnly={true} // Only show changed lines
+          renderContent={(str) => (
+            <span
+              style={{
+                fontFamily: 'inherit',
+                fontSize: 'inherit',
+                lineHeight: 'inherit',
+              }}
+            >
+              {str}
+            </span>
+          )}
         />
+      </Box>
+
+      {/* Footer with stats */}
+      <Box
+        sx={{
+          p: 1,
+          borderTop: `1px solid ${theme.palette.divider}`,
+          backgroundColor: theme.palette.mode === 'dark' ? '#161b22' : '#f6f8fa',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+        }}
+      >
+        <Typography variant="caption" color="text.secondary">
+          {readOnly ? 'Read-only view' : 'Editable'}
+        </Typography>
+        <Typography variant="caption" color="text.secondary">
+          {original.split('\n').length} → {modified.split('\n').length} lines
+        </Typography>
       </Box>
     </Paper>
   );

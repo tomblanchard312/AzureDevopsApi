@@ -11,21 +11,22 @@ Goals for code suggestions
 Key architecture notes (big picture)
 
 - API project: [ADOApi](ADOApi) — controllers under `ADOApi/Controllers/`, services under `ADOApi/Services/`, interfaces in `ADOApi/Interfaces/`.
-- Frontend: [ADOApi.UI](ADOApi.UI) — Blazor WASM app (optional, separate host).
+- Frontend: [adoapi-ui](adoapi-ui) — React/Vite app with Material-UI, Monaco Editor, and MSAL authentication (optional, separate host).
 - DI and clients: `VssConnection` is registered in `Program.cs` and used to obtain `WorkItemTrackingHttpClient`, `GitHttpClient`, and `ProjectHttpClient`. Implement changes by updating the concrete services and keeping constructor signatures stable.
-- AI: Semantic Kernel is configured as a singleton in `Program.cs` using `AddAzureOpenAIChatCompletion`. Required config keys: `OpenAI:DeploymentName`, `OpenAI:Endpoint`, `OpenAI:ApiKey`.
+- AI: Semantic Kernel is configured as a singleton in `Program.cs` with LLM provider abstraction supporting Azure OpenAI and Ollama. Required config keys depend on provider: `OpenAI:DeploymentName`, `OpenAI:Endpoint`, `OpenAI:ApiKey` (Azure OpenAI) or `Ollama:Model` (Ollama).
 - Retries and resilience: service classes use Polly retry policies (ex: `RepositoryService`, `AzureDevOpsService`). Reuse the same style and logging on retries.
 
 Important config and runtime commands
 
 - Required config keys (in `appsettings.json` or environment):
   - `AzureDevOps:OrganizationUrl`
-  - `AzureDevOps:PersonalAccessToken`
-  - `OpenAI:DeploymentName`, `OpenAI:Endpoint`, `OpenAI:ApiKey`
+  - `AzureDevOpsEntra:TenantId`, `AzureDevOpsEntra:ClientId`, `AzureDevOpsEntra:ClientSecret`
+  - `OpenAI:DeploymentName`, `OpenAI:Endpoint`, `OpenAI:ApiKey` (when using Azure OpenAI)
+  - `LLM:Provider` (to switch between "AzureOpenAI" and "Ollama")
 - Build and run (development):
   - `dotnet build ADOApi.sln`
   - `dotnet run --project ADOApi` (API + Swagger hosted at `/`)
-  - `dotnet run --project ADOApi.UI` (run frontend separately)
+  - `cd adoapi-ui && npm install && npm run dev` (run React/Vite frontend separately)
 
 Controller & route examples (use when adding endpoints)
 

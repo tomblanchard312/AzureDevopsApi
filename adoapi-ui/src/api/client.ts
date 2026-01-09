@@ -8,6 +8,14 @@ import type {
   DocsPreviewResponse,
   DocsApplyRequest,
   DocsApplyResponse,
+  PullRequestCommentRequest,
+  PullRequestCommentResponse,
+  InlineCommentRequest,
+  InlineCommentResponse,
+  ThreadResolutionRequest,
+  ThreadResolutionResponse,
+  PrStatusRequest,
+  PrStatusResponse,
   ApiError,
 } from '../types/api';
 import {
@@ -15,6 +23,10 @@ import {
   RepositorySchema,
   DocsPreviewResponseSchema,
   DocsApplyResponseSchema,
+  PullRequestCommentResponseSchema,
+  InlineCommentResponseSchema,
+  ThreadResolutionResponseSchema,
+  PrStatusResponseSchema,
 } from '../types/api';
 import { useMsal } from '@azure/msal-react';
 import { InteractionRequiredAuthError } from '@azure/msal-browser';
@@ -233,6 +245,38 @@ export const api = {
   async applyDocs(request: DocsApplyRequest): Promise<DocsApplyResponse> {
     const response = await apiClient.post('/api/docs/apply', request);
     return validateResponse(response, DocsApplyResponseSchema);
+  },
+
+  // PR comment methods
+  async postPullRequestComment(request: PullRequestCommentRequest): Promise<PullRequestCommentResponse> {
+    const response = await apiClient.post('/api/security-advisor/pr/comment', request);
+    return validateResponse(response, PullRequestCommentResponseSchema);
+  },
+
+  async previewPullRequestComment(request: PullRequestCommentRequest): Promise<PullRequestCommentResponse> {
+    const response = await apiClient.post('/api/security-advisor/pr/comment/preview', request);
+    return validateResponse(response, PullRequestCommentResponseSchema);
+  },
+
+  async updatePullRequestComment(threadId: number, request: PullRequestCommentRequest): Promise<PullRequestCommentResponse> {
+    const response = await apiClient.put(`/api/security-advisor/pr/comment/${threadId}`, request);
+    return validateResponse(response, PullRequestCommentResponseSchema);
+  },
+
+  // Enhanced PR integration methods
+  async postInlineComment(request: InlineCommentRequest): Promise<InlineCommentResponse> {
+    const response = await apiClient.post('/api/security-advisor/pr/inline-comment', request);
+    return validateResponse(response, InlineCommentResponseSchema);
+  },
+
+  async resolveFixedThreads(request: ThreadResolutionRequest): Promise<ThreadResolutionResponse> {
+    const response = await apiClient.post('/api/security-advisor/pr/resolve-threads', request);
+    return validateResponse(response, ThreadResolutionResponseSchema);
+  },
+
+  async postPrStatus(request: PrStatusRequest): Promise<PrStatusResponse> {
+    const response = await apiClient.post('/api/security-advisor/pr/status', request);
+    return validateResponse(response, PrStatusResponseSchema);
   },
 };
 

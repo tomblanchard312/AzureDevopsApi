@@ -69,7 +69,7 @@ C4Container
 
   Person(user, "User", "Developer or tool user")
   Container(api, "ADOApi", ".NET 8 API", "Provides REST endpoints for Azure DevOps and AI")
-  Container(ui, "ADOApi.UI", "Blazor WASM", "Optional web UI")
+  Container(ui, "adoapi-ui", "React", "Optional web UI")
   Container(azdo, "Azure DevOps", "External", "Work items, repos")
   Container(openai, "Azure OpenAI", "External", "AI chat completions")
   Container(kv, "Azure Key Vault", "External", "Secrets storage")
@@ -87,7 +87,7 @@ C4Container
 ```mermaid
 sequenceDiagram
   participant U as User
-  participant UI as Blazor UI
+  participant UI as React UI
   participant API as ADOApi
   participant AI as Azure OpenAI
   participant Repo as Azure DevOps Repo
@@ -111,7 +111,7 @@ C4Container
   title Container diagram for AzureDevopsApi
 
   Person(user, "User", "Developer or tool user")
-  Container(ui, "Blazor WebAssembly UI", "Blazor WASM", "Web UI for interacting with API")
+  Container(ui, "React UI", "React", "Web UI for interacting with API")
   Container(api, "AzureDevopsApi", ".NET 8", "ASP.NET Core API for Azure DevOps and AI")
   Container(azdo, "Azure DevOps", "External", "Work items, repositories")
   Container(ai, "Azure OpenAI / Ollama", "External", "AI service for chat completions")
@@ -129,7 +129,7 @@ C4Container
 ```mermaid
 sequenceDiagram
   participant U as User
-  participant UI as Blazor WebAssembly UI
+  participant UI as React UI
   participant API as AzureDevopsApi
   participant AI as Azure OpenAI / Ollama
   participant Repo as Azure DevOps Repo

@@ -6,5 +6,13 @@ export type {
   DocsPreviewResponse,
   DocsApplyRequest,
   DocsApplyResponse,
+  PullRequestCommentRequest,
+  PullRequestCommentResponse,
+  InlineCommentRequest,
+  InlineCommentResponse,
+  ThreadResolutionRequest,
+  ThreadResolutionResponse,
+  PrStatusRequest,
+  PrStatusResponse,
   ApiError,
 } from '../types/api';

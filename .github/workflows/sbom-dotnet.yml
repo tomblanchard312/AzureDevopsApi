@@ -1,0 +1,47 @@
+name: SBOM (.NET - CycloneDX)
+
+on:
+  push:
+    branches:
+      - "**"
+  pull_request:
+    branches:
+      - "**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sbom-dotnet:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Restore .NET dependencies
+        run: dotnet restore
+
+      - name: Install CycloneDX .NET tool
+        run: dotnet tool install --global CycloneDX
+
+      - name: Generate .NET SBOM
+        run: |
+          mkdir -p sbom
+          cyclonedx dotnet \
+            --json \
+            --exclude-dev \
+            --output sbom/sbom.dotnet.cdx.json
+
+      - name: Upload SBOM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-dotnet-cyclonedx
+          path: sbom/sbom.dotnet.cdx.json
+          if-no-files-found: error

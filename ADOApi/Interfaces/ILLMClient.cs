@@ -6,5 +6,7 @@ namespace ADOApi.Interfaces
     public interface ILLMClient
     {
         Task<string> GenerateAsync(string systemPrompt, string userPrompt, CancellationToken ct = default);
+        string GetModelProvider();
+        string GetModelName();
     }
 }

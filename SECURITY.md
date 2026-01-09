@@ -17,7 +17,7 @@ This document outlines security measures and considerations for AzureDevopsApi.
 ## Secrets Management
 
 - Secrets stored in Azure Key Vault (production) or user-secrets (development).
-- Startup validates required secrets (`OpenAI:ApiKey`, `AzureDevOps:PersonalAccessToken`).
+- Startup validates required secrets based on configuration (e.g., `AzureDevOpsEntra:ClientSecret` when using Entra auth, `OpenAI:ApiKey` when using Azure OpenAI).
 - Uses `DefaultAzureCredential` for Key Vault access via managed identity.
 
 ## Input Validation and AI Safety

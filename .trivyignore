@@ -1,0 +1,34 @@
+# Trivy Ignore File for AzureDevopsApi
+# This file allows you to ignore specific vulnerabilities found by Trivy
+# Format: [package-type:]package-name[:version][:ecosystem] [vulnerability-id]
+#
+# Note: This file is optional. To use it, you may need to run Trivy locally or modify the workflow.
+# The current GitHub Action workflow does not support ignore files directly.
+#
+# Examples:
+# - Ignore specific vulnerability: CVE-2021-44228
+# - Ignore package: alpine:3.15
+# - Ignore by ecosystem: npm:axios:1.6.0
+#
+# IMPORTANT: Only ignore vulnerabilities after careful consideration and risk assessment.
+# Document the reason for ignoring in comments.
+
+# Example ignore rules (uncomment and modify as needed):
+
+# Ignore specific vulnerability in a package
+# npm:axios CVE-2021-12345
+
+# Ignore all vulnerabilities in a specific package version
+# golang:github.com/example/package:1.2.3
+
+# Ignore vulnerabilities in development dependencies (if applicable)
+# dev:npm:webpack-dev-server
+
+# Common reasons for ignoring:
+# 1. False positive - vulnerability doesn't affect your usage
+# 2. Not applicable - vulnerability is in unused code paths
+# 3. Risk accepted - vulnerability risk is acceptable for your use case
+# 4. Fixed in your environment - vulnerability patched at infrastructure level
+
+# Add your ignore rules below this line:
+# [package-type:]package-name[:version][:ecosystem] [vulnerability-id] # Reason for ignoring

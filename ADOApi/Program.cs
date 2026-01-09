@@ -27,6 +27,8 @@ using Microsoft.SemanticKernel.Connectors.OpenAI;
 using Azure.AI.OpenAI;
 using IAuthService = ADOApi.Interfaces.IAuthenticationService;
 using AuthService = ADOApi.Services.AuthenticationService;
+using Microsoft.EntityFrameworkCore;
+using ADOApi.Data;
 
 using System;
 using System.Net.Http;
@@ -124,6 +126,49 @@ builder.Services.AddScoped<ICachingService, CachingService>();
 builder.Services.AddScoped<IWebhookService, WebhookService>();
 builder.Services.AddScoped<IRepositoryService, RepositoryService>();
 builder.Services.AddScoped<IDocsGenerationService, DocsGenerationService>();
+builder.Services.AddScoped<ISecurityAdvisorService, SecurityAdvisorService>();
+builder.Services.AddScoped<ISecurityGovernanceService, SecurityGovernanceService>();
+builder.Services.AddScoped<IPullRequestCommentService, PullRequestCommentService>();
+
+// Register repository memory services
+builder.Services.AddScoped<IRepoMemoryService, RepoMemoryService>();
+builder.Services.AddScoped<IInsightService, InsightService>();
+builder.Services.AddScoped<IWorkItemLinkService, WorkItemLinkService>();
+builder.Services.AddScoped<IAgentRunService, AgentRunService>();
+builder.Services.AddScoped<IFingerprintService, FingerprintService>();
+
+// Configure database provider switching (SQLite default, Azure SQL optional)
+var databaseProvider = builder.Configuration["Database:Provider"] ?? "SQLite";
+switch (databaseProvider.ToUpperInvariant())
+{
+    case "SQLSERVER":
+        builder.Services.AddDbContext<SecurityAdvisorDbContext>(options =>
+            options.UseSqlServer(
+                builder.Configuration.GetConnectionString("SecurityAdvisorDb") ??
+                throw new InvalidOperationException("SQL Server connection string 'SecurityAdvisorDb' is required when using SQL Server provider"),
+                sqlOptions => sqlOptions.EnableRetryOnFailure(
+                    maxRetryCount: 3,
+                    maxRetryDelay: TimeSpan.FromSeconds(5),
+                    errorNumbersToAdd: null)));
+        break;
+    case "SQLITE":
+    default:
+        builder.Services.AddDbContext<SecurityAdvisorDbContext>(options =>
+            options.UseSqlite(
+                builder.Configuration.GetConnectionString("SecurityAdvisorDb") ??
+                "Data Source=securityadvisor.db"));
+        break;
+}
+
+// Register Security Advisor repository
+builder.Services.AddScoped<ISecurityAdvisorRepository, SecurityAdvisorRepository>();
+
+// Ensure database is created on startup
+using (var scope = builder.Services.BuildServiceProvider().CreateScope())
+{
+    var dbContext = scope.ServiceProvider.GetRequiredService<SecurityAdvisorDbContext>();
+    dbContext.Database.EnsureCreated();
+}
 
 // Register Azure DevOps connection factory
 builder.Services.AddSingleton<IAzureDevOpsConnectionFactory, AzureDevOpsConnectionFactory>();
@@ -186,6 +231,9 @@ builder.Services.AddSwaggerGen(c =>
 builder.Services.AddLogging();
 // Audit logger
 builder.Services.AddSingleton<IAuditLogger, AuditLogger>();
+
+// Register background services
+builder.Services.AddHostedService<RiskAcceptanceExpiryService>();
 
 // Resilience policies for Azure DevOps calls
 builder.Services.AddSingleton<ResiliencePolicies>();

@@ -1,0 +1,119 @@
+name: Vulnerability Scan (SBOM)
+
+on:
+  push:
+    branches:
+      - "**"
+  pull_request:
+    branches:
+      - "**"
+  schedule:
+    # Run weekly on Mondays at 9 AM UTC
+    - cron: '0 9 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  vuln-scan:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: adoapi-ui/package-lock.json
+
+      - name: Install CycloneDX .NET tool
+        run: dotnet tool install --global CycloneDX
+
+      - name: Restore .NET dependencies
+        run: dotnet restore ADOApi.sln
+
+      - name: Generate CycloneDX SBOM for .NET
+        run: |
+          cd ADOApi
+          dotnet CycloneDX ADOApi.csproj --json --output ../sbom-dotnet.json
+          cd ..
+
+      - name: Install React dependencies
+        run: |
+          cd adoapi-ui
+          npm ci
+          cd ..
+
+      - name: Generate CycloneDX SBOM for React
+        uses: anchore/sbom-action@v0
+        with:
+          path: adoapi-ui
+          artifact-name: sbom-react
+          output-file: ./sbom-react.json
+          format: cyclonedx-json
+
+      - name: Merge SBOMs
+        run: |
+          # Install jq for JSON manipulation
+          sudo apt-get update && sudo apt-get install -y jq
+
+          # Create a merged SBOM
+          jq -s '{
+            "$schema": "http://cyclonedx.org/schema/bom-1.5.schema.json",
+            "bomFormat": "CycloneDX",
+            "specVersion": "1.5",
+            "serialNumber": "urn:uuid:'"$(uuidgen)"'",
+            "version": 1,
+            "metadata": {
+              "timestamp": now | strftime("%Y-%m-%dT%H:%M:%SZ"),
+              "tools": [
+                {
+                  "vendor": "AzureDevopsApi",
+                  "name": "SBOM Merger",
+                  "version": "1.0.0"
+                }
+              ],
+              "component": {
+                "type": "application",
+                "name": "AzureDevopsApi",
+                "version": "1.0.0"
+              }
+            },
+            "components": [.[].components?[]? // empty | add] | flatten,
+            "dependencies": [.[].dependencies?[]? // empty | add] | flatten
+          }' sbom-dotnet.json sbom-react.json > sbom-merged.json
+
+      - name: Upload SBOM artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-artifacts
+          path: |
+            sbom-*.json
+          retention-days: 30
+
+      - name: Run Trivy vulnerability scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'sbom'
+          scan-ref: 'sbom-merged.json'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          ignore-unfixed: true
+          severity: 'HIGH,CRITICAL'
+          exit-code: '1'
+
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
