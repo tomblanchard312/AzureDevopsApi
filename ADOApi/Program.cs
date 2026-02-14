@@ -25,8 +25,6 @@ using Microsoft.VisualStudio.Services.Common;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.Connectors.OpenAI;
 using Azure.AI.OpenAI;
-using IAuthService = ADOApi.Interfaces.IAuthenticationService;
-using AuthService = ADOApi.Services.AuthenticationService;
 using Microsoft.EntityFrameworkCore;
 using ADOApi.Data;
 
@@ -139,7 +137,6 @@ builder.Services.AddScoped<ProjectHttpClient>(sp =>
 // Register services
 builder.Services.AddScoped<IWorkItemService, WorkItemService>();
 builder.Services.AddScoped<IAzureDevOpsService, AzureDevOpsService>();
-builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IQueryService, QueryService>();
 builder.Services.AddScoped<ICachingService, CachingService>();
 builder.Services.AddScoped<IWebhookService, WebhookService>();
@@ -236,6 +233,17 @@ builder.Services.AddSwaggerGen(c =>
         }
     });
 
+    // Also support direct Bearer token input for API consumers with pre-acquired JWT tokens
+    c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    {
+        Description = "JWT Bearer token. Enter: Bearer {your token}",
+        Name = "Authorization",
+        In = ParameterLocation.Header,
+        Type = SecuritySchemeType.Http,
+        Scheme = "bearer",
+        BearerFormat = "JWT"
+    });
+
     c.OperationFilter<ADOApi.Utilities.SwaggerAuthorizeOperationFilter>();
 });
 
@@ -296,7 +304,15 @@ if (app.Environment.IsProduction())
         if (string.IsNullOrEmpty(app.Configuration["OpenAI:Deployment"])) missing.Add("OpenAI:Deployment");
     }
 
-    if (string.IsNullOrEmpty(app.Configuration["AzureDevOps:PersonalAccessToken"])) missing.Add("AzureDevOps:PersonalAccessToken");
+    var useEntraAuth = app.Configuration.GetValue<bool>("AzureDevOps:UseEntraAuth");
+    if (!useEntraAuth && string.IsNullOrEmpty(app.Configuration["AzureDevOps:PersonalAccessToken"]))
+        missing.Add("AzureDevOps:PersonalAccessToken");
+    if (useEntraAuth)
+    {
+        if (string.IsNullOrEmpty(app.Configuration["AzureDevOpsEntra:ClientId"])) missing.Add("AzureDevOpsEntra:ClientId");
+        if (string.IsNullOrEmpty(app.Configuration["AzureDevOpsEntra:ClientSecret"])) missing.Add("AzureDevOpsEntra:ClientSecret");
+        if (string.IsNullOrEmpty(app.Configuration["AzureDevOpsEntra:TenantId"])) missing.Add("AzureDevOpsEntra:TenantId");
+    }
     if (missing.Count > 0)
     {
         app.Logger.LogCritical("Missing required secrets/configuration: {Missing}", string.Join(',', missing));
@@ -337,8 +353,7 @@ app.UseRouting();
 app.UseCors("DefaultCors");
 app.UseAuthentication();
 app.UseAuthorization();
-app.MapControllerRoute(
-    name: "default",
-    pattern: "{version:apiVersion=1.0}/api/{controller}/{action}/{id?}");
+// Map attribute-routed controllers (all controllers use [Route("api/[controller]")])
+app.MapControllers();
 
 app.Run();

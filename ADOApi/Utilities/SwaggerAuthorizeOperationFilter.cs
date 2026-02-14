@@ -25,6 +25,12 @@ namespace ADOApi.Utilities
             {
                 [oauthScheme] = new[] { "api://default/.default" }
             });
+
+            var bearerScheme = new OpenApiSecurityScheme { Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "Bearer" } };
+            operation.Security.Add(new OpenApiSecurityRequirement
+            {
+                [bearerScheme] = System.Array.Empty<string>()
+            });
         }
     }
 }

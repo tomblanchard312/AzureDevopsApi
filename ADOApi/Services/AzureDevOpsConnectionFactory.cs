@@ -65,9 +65,9 @@ namespace ADOApi.Services
                 var pat = _configuration["AzureDevOps:PersonalAccessToken"];
                 if (string.IsNullOrEmpty(pat) || pat.Contains("["))
                 {
-                    // For development, use a dummy PAT if not configured
-                    pat = "dummy-pat-for-development";
-                    _logger.LogWarning("Using dummy PAT for development. Configure AzureDevOps:PersonalAccessToken for production use.");
+                    throw new InvalidOperationException(
+                        "AzureDevOps:PersonalAccessToken is not configured. " +
+                        "Set it via appsettings.json, user secrets, environment variables, or Key Vault.");
                 }
                 var credentials = new VssBasicCredential(string.Empty, pat);
                 return new VssConnection(new Uri(organizationUrl), credentials);

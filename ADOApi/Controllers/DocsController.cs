@@ -13,6 +13,7 @@ namespace ADOApi.Controllers
     [ApiController]
     [ApiVersion("1.0")]
     [Route("api/[controller]")]
+    [Microsoft.AspNetCore.Authorization.Authorize(Policy = "ADO.ReadOnly")]
     public class DocsController : ControllerBase
     {
         private readonly IRepositoryService _repositoryService;
