@@ -16,6 +16,7 @@ namespace ADOApi.Services
         private readonly IConfiguration _configuration;
         private readonly ILogger<AzureDevOpsConnectionFactory> _logger;
         private readonly IConfidentialClientApplication _msalClient;
+        private readonly SemaphoreSlim _tokenLock = new(1, 1);
         private string? _cachedToken;
         private DateTimeOffset _tokenExpiry = DateTimeOffset.MinValue;
 
@@ -80,15 +81,23 @@ namespace ADOApi.Services
                 throw new InvalidOperationException("MSAL client not configured for Entra authentication.");
             }
 
+            // Double-check pattern: read cached token without lock first
             if (_cachedToken != null && DateTimeOffset.UtcNow < _tokenExpiry.AddMinutes(-5))
             {
                 return _cachedToken;
             }
 
-            var scopes = _configuration.GetSection("AzureDevOpsEntra:Scopes").Get<string[]>() ?? new[] { "499b84ac-1321-427f-aa17-267ca6975798/.default" };
-
+            await _tokenLock.WaitAsync(ct);
             try
             {
+                // Re-check after acquiring lock (another thread may have refreshed)
+                if (_cachedToken != null && DateTimeOffset.UtcNow < _tokenExpiry.AddMinutes(-5))
+                {
+                    return _cachedToken;
+                }
+
+                var scopes = _configuration.GetSection("AzureDevOpsEntra:Scopes").Get<string[]>() ?? new[] { "499b84ac-1321-427f-aa17-267ca6975798/.default" };
+
                 var result = await _msalClient.AcquireTokenForClient(scopes).ExecuteAsync(ct);
                 _cachedToken = result.AccessToken;
                 _tokenExpiry = result.ExpiresOn;
@@ -98,6 +107,10 @@ namespace ADOApi.Services
             {
                 _logger.LogError(ex, "Failed to acquire Entra token for Azure DevOps");
                 throw new InvalidOperationException("Failed to acquire authentication token.", ex);
+            }
+            finally
+            {
+                _tokenLock.Release();
             }
         }
     }

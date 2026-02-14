@@ -15,6 +15,8 @@ namespace ADOApi.Utilities
         private readonly IConfiguration _configuration;
 
         private readonly ConcurrentDictionary<string, RateLimitInfo> _store = new();
+        private DateTime _lastCleanup = DateTime.UtcNow;
+        private readonly object _cleanupLock = new();
 
         private readonly int _defaultMaxRequests;
         private readonly int _defaultWindowSeconds;
@@ -47,6 +49,25 @@ namespace ADOApi.Utilities
         public async Task InvokeAsync(HttpContext context)
         {
             var now = DateTime.UtcNow;
+
+            // Periodically evict expired entries to prevent unbounded memory growth
+            if (now - _lastCleanup > TimeSpan.FromMinutes(5))
+            {
+                lock (_cleanupLock)
+                {
+                    if (now - _lastCleanup > TimeSpan.FromMinutes(5))
+                    {
+                        _lastCleanup = now;
+                        foreach (var kvp in _store)
+                        {
+                            if (now - kvp.Value.LastReset > TimeSpan.FromSeconds(kvp.Value.WindowSeconds * 2))
+                            {
+                                _store.TryRemove(kvp.Key, out _);
+                            }
+                        }
+                    }
+                }
+            }
 
             // Quick checks: body size
             if (context.Request.ContentLength.HasValue && context.Request.ContentLength.Value > _maxRequestBodySize)

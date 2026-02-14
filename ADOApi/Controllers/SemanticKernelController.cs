@@ -3,6 +3,7 @@ using ADOApi.Interfaces;
 using ADOApi.Models;
 using Microsoft.TeamFoundation.WorkItemTracking.WebApi.Models;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using System.Linq;
 using System.Collections.Generic;
 
@@ -17,12 +18,14 @@ namespace ADOApi.Controllers
         private readonly IWorkItemService _workItemService;
         private readonly ISemanticChatService _chatService;
         private readonly IConfiguration _configuration;
+        private readonly ILogger<SemanticKernelController> _logger;
 
-        public SemanticKernelController(IWorkItemService workItemService, ISemanticChatService chatService, IConfiguration configuration)
+        public SemanticKernelController(IWorkItemService workItemService, ISemanticChatService chatService, IConfiguration configuration, ILogger<SemanticKernelController> logger)
         {
             _workItemService = workItemService;
             _chatService = chatService;
             _configuration = configuration;
+            _logger = logger;
         }
 
         [HttpPost("query")]
@@ -109,7 +112,8 @@ namespace ADOApi.Controllers
             }
             catch (Exception ex)
             {
-                return StatusCode(500, $"An error occurred: {ex.Message}");
+                _logger.LogError(ex, "Error querying work items via SemanticKernel");
+                return StatusCode(500, "An internal error occurred");
             }
         }
 

@@ -30,16 +30,17 @@ namespace ADOApi.Controllers
             _azureDevOpsService = azureDevOpsService;
             _logger = logger;
             _auditLogger = auditLogger;
-            
-            // Configure retry policy
+
+            // Configure retry policy for transient HTTP failures only
             _retryPolicy = Policy
-                .Handle<Exception>()
-                .WaitAndRetryAsync(3, retryAttempt => 
+                .Handle<HttpRequestException>()
+                .Or<TimeoutException>()
+                .WaitAndRetryAsync(3, retryAttempt =>
                     TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)),
                     onRetry: (exception, timeSpan, retryCount, context) =>
                     {
-                        _logger.LogWarning(exception, 
-                            "Retry {RetryCount} after {Delay}ms due to: {Message}", 
+                        _logger.LogWarning(exception,
+                            "Retry {RetryCount} after {Delay}ms due to: {Message}",
                             retryCount, timeSpan.TotalMilliseconds, exception.Message);
                     });
         }
@@ -67,7 +68,8 @@ namespace ADOApi.Controllers
             }
             catch (Exception ex)
             {
-                return StatusCode(500, $"Error: {ex.Message}");
+                _logger.LogError(ex, "Error retrieving work item types");
+                return StatusCode(500, "An internal error occurred");
             }
         }
         [HttpGet("workitemforproject")]
@@ -79,7 +81,8 @@ namespace ADOApi.Controllers
             }
             catch (Exception ex)
             {
-                return StatusCode(500, $"Error: {ex.Message}");
+                _logger.LogError(ex, "Error retrieving work items for project");
+                return StatusCode(500, "An internal error occurred");
             }
         }
         [HttpGet("workitemsassignedtouser")]
@@ -92,9 +95,10 @@ namespace ADOApi.Controllers
             }
             catch (Exception ex)
             {
-                return StatusCode(500, $"Error: {ex.Message}");
+                _logger.LogError(ex, "Error retrieving assigned work items");
+                return StatusCode(500, "An internal error occurred");
             }
-        }        
+        }
         [HttpGet("workitemsbytype")]
         public async Task<ActionResult<List<WorkItem>>> GetWorkItemsByType(string project, string workItemType)
         {
@@ -105,7 +109,8 @@ namespace ADOApi.Controllers
             }
             catch (Exception ex)
             {
-                return StatusCode(500, $"Error: {ex.Message}");
+                _logger.LogError(ex, "Error retrieving work items by type");
+                return StatusCode(500, "An internal error occurred");
             }
         }
         [HttpPost]
@@ -152,7 +157,8 @@ namespace ADOApi.Controllers
                 evt.Success = false;
                 evt.ErrorMessage = ex.Message;
                 await _auditLogger.AuditAsync(evt);
-                return StatusCode(500, $"Error adding work item: {ex.Message}");
+                _logger.LogError(ex, "Error adding work item");
+                return StatusCode(500, "An internal error occurred");
             }
         }
         [HttpPut("{workItemId}")]
@@ -208,14 +214,15 @@ namespace ADOApi.Controllers
                 evt.Success = false;
                 evt.ErrorMessage = ex.Message;
                 await _auditLogger.AuditAsync(evt);
-                return Conflict(new { error = "Conflict", details = ex.Message });
+                return Conflict(new { error = "Conflict", details = "The work item has been modified by another user. Please refresh and try again." });
             }
             catch (Exception ex)
             {
                 evt.Success = false;
                 evt.ErrorMessage = ex.Message;
                 await _auditLogger.AuditAsync(evt);
-                return StatusCode(500, $"Error updating work item: {ex.Message}");
+                _logger.LogError(ex, "Error updating work item {WorkItemId}", workItemId);
+                return StatusCode(500, "An internal error occurred");
             }
         }
         [HttpGet("workitembyid")]
@@ -235,8 +242,8 @@ namespace ADOApi.Controllers
             }
             catch (AzureDevOpsApiException ex)
             {
-                // Handle the exception and return an appropriate error response
-                return StatusCode(500, $"An error occurred while retrieving the work item: {ex.Message}");
+                _logger.LogError(ex, "Error retrieving work item {WorkItemId}", workItemId);
+                return StatusCode(500, "An internal error occurred");
             }
         }
         [HttpGet("recent")]
@@ -249,7 +256,8 @@ namespace ADOApi.Controllers
             }
             catch (Exception ex)
             {
-                return StatusCode(500, $"Error retrieving recent work items: {ex.Message}");
+                _logger.LogError(ex, "Error retrieving recent work items");
+                return StatusCode(500, "An internal error occurred");
             }
         }
         [HttpGet("{workItemId}")]
@@ -267,7 +275,8 @@ namespace ADOApi.Controllers
             }
             catch (Exception ex)
             {
-                return StatusCode(500, $"Error retrieving work item: {ex.Message}");
+                _logger.LogError(ex, "Error retrieving work item {WorkItemId}", workItemId);
+                return StatusCode(500, "An internal error occurred");
             }
         }
         [HttpGet("project/{project}")]
@@ -280,7 +289,8 @@ namespace ADOApi.Controllers
             }
             catch (Exception ex)
             {
-                return StatusCode(500, $"Error retrieving project work items: {ex.Message}");
+                _logger.LogError(ex, "Error retrieving project work items");
+                return StatusCode(500, "An internal error occurred");
             }
         }
         [HttpGet("assigned/{project}/{userIdentifier}")]
@@ -293,7 +303,8 @@ namespace ADOApi.Controllers
             }
             catch (Exception ex)
             {
-                return StatusCode(500, $"Error retrieving assigned work items: {ex.Message}");
+                _logger.LogError(ex, "Error retrieving assigned work items");
+                return StatusCode(500, "An internal error occurred");
             }
         }
 
@@ -331,7 +342,7 @@ namespace ADOApi.Controllers
                 evt.ErrorMessage = ex.Message;
                 await _auditLogger.AuditAsync(evt);
                 _logger.LogError(ex, "Error creating work item template");
-                return StatusCode(500, new { error = "Failed to create template", details = ex.Message });
+                return StatusCode(500, "An internal error occurred");
             }
         }
 
@@ -349,11 +360,12 @@ namespace ADOApi.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error retrieving work item templates");
-                return StatusCode(500, new { error = "Failed to retrieve templates", details = ex.Message });
+                return StatusCode(500, "An internal error occurred");
             }
         }
 
         [HttpPost("from-template/{templateId}")]
+        [Microsoft.AspNetCore.Authorization.Authorize(Policy = "ADO.Contributor")]
         public async Task<ActionResult<int>> CreateFromTemplate(int templateId, [FromBody] Dictionary<string, object>? overrides = null)
         {
             var evt = new ADOApi.Models.AuditEvent
@@ -382,7 +394,7 @@ namespace ADOApi.Controllers
                 evt.ErrorMessage = ex.Message;
                 await _auditLogger.AuditAsync(evt);
                 _logger.LogError(ex, "Error creating work item from template");
-                return StatusCode(500, new { error = "Failed to create work item from template", details = ex.Message });
+                return StatusCode(500, "An internal error occurred");
             }
         }
 
@@ -415,7 +427,7 @@ namespace ADOApi.Controllers
                 evt.ErrorMessage = ex.Message;
                 await _auditLogger.AuditAsync(evt);
                 _logger.LogError(ex, "Error deleting work item template");
-                return StatusCode(500, new { error = "Failed to delete template", details = ex.Message });
+                return StatusCode(500, "An internal error occurred");
             }
         }
 
@@ -449,7 +461,7 @@ namespace ADOApi.Controllers
                 evt.ErrorMessage = ex.Message;
                 await _auditLogger.AuditAsync(evt);
                 _logger.LogError(ex, "Error adding work item relation");
-                return StatusCode(500, new { error = "Failed to add relation", details = ex.Message });
+                return StatusCode(500, "An internal error occurred");
             }
         }
 
@@ -483,7 +495,7 @@ namespace ADOApi.Controllers
                 evt.ErrorMessage = ex.Message;
                 await _auditLogger.AuditAsync(evt);
                 _logger.LogError(ex, "Error removing work item relation");
-                return StatusCode(500, new { error = "Failed to remove relation", details = ex.Message });
+                return StatusCode(500, "An internal error occurred");
             }
         }
 
@@ -498,7 +510,7 @@ namespace ADOApi.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error retrieving work item relations");
-                return StatusCode(500, new { error = "Failed to retrieve relations", details = ex.Message });
+                return StatusCode(500, "An internal error occurred");
             }
         }
 
@@ -513,7 +525,7 @@ namespace ADOApi.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error retrieving related work items");
-                return StatusCode(500, new { error = "Failed to retrieve related work items", details = ex.Message });
+                return StatusCode(500, "An internal error occurred");
             }
         }
 
@@ -529,13 +541,13 @@ namespace ADOApi.Controllers
             {
                 var workItems = await _retryPolicy.ExecuteAsync(async () =>
                     await _azureDevOpsService.GetFilteredWorkItemsAsync(filter));
-                
+
                 return Ok(workItems);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error filtering work items");
-                return StatusCode(500, new { error = "Failed to filter work items", details = ex.Message });
+                return StatusCode(500, "An internal error occurred");
             }
         }
     }

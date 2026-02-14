@@ -117,7 +117,7 @@ namespace ADOApi.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error creating personal access token");
-                return StatusCode(500, $"Error: {ex.Message}");
+                return StatusCode(500, "An internal error occurred");
             }
         }
 
@@ -131,11 +131,13 @@ namespace ADOApi.Controllers
             }
             catch (ArgumentException ex)
             {
-                return BadRequest(ex.Message);
+                _logger.LogWarning(ex, "Invalid argument retrieving tokens");
+                return BadRequest("Invalid request parameters");
             }
             catch (Exception ex)
             {
-                return StatusCode(500, $"Error: {ex.Message}");
+                _logger.LogError(ex, "Error retrieving personal access tokens");
+                return StatusCode(500, "An internal error occurred");
             }
         }
 

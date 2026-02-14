@@ -343,7 +343,7 @@ namespace ADOApi.Controllers
         }
 
         [HttpPost("pr/inline-comment")]
-        [Authorize(Policy = "ADOContributor")]
+        [Authorize(Policy = "ADO.Contributor")]
         [ProducesResponseType(typeof(InlineCommentResponse), 200)]
         [ProducesResponseType(400)]
         [ProducesResponseType(500)]
@@ -394,7 +394,7 @@ namespace ADOApi.Controllers
         }
 
         [HttpPost("pr/resolve-threads")]
-        [Authorize(Policy = "ADOContributor")]
+        [Authorize(Policy = "ADO.Contributor")]
         [ProducesResponseType(typeof(ThreadResolutionResponse), 200)]
         [ProducesResponseType(400)]
         [ProducesResponseType(500)]
@@ -445,7 +445,7 @@ namespace ADOApi.Controllers
         }
 
         [HttpPost("pr/status")]
-        [Authorize(Policy = "ADOContributor")]
+        [Authorize(Policy = "ADO.Contributor")]
         [ProducesResponseType(typeof(PrStatusResponse), 200)]
         [ProducesResponseType(400)]
         [ProducesResponseType(500)]

@@ -61,6 +61,8 @@ builder.Services.AddHttpClient();
 if (builder.Environment.IsDevelopment())
 {
     // In development, allow anonymous access for easier testing
+    // WARNING: All authorization policies are bypassed in development mode.
+    // Ensure this application is never deployed with ASPNETCORE_ENVIRONMENT=Development.
     builder.Services.AddAuthentication();
     builder.Services.AddAuthorization(options =>
     {
@@ -108,10 +110,12 @@ builder.Services.AddApiVersioning(options =>
 });
 
 // Configure Azure DevOps clients
+// Use Task.Run to ensure the async call runs on a thread pool thread,
+// avoiding potential deadlocks from blocking on async code.
 builder.Services.AddScoped<VssConnection>(sp =>
 {
     var factory = sp.GetRequiredService<IAzureDevOpsConnectionFactory>();
-    return factory.CreateConnectionAsync().GetAwaiter().GetResult();
+    return Task.Run(() => factory.CreateConnectionAsync()).GetAwaiter().GetResult();
 });
 
 builder.Services.AddScoped<WorkItemTrackingHttpClient>(sp =>
@@ -177,13 +181,6 @@ switch (databaseProvider.ToUpperInvariant())
 
 // Register Security Advisor repository
 builder.Services.AddScoped<ISecurityAdvisorRepository, SecurityAdvisorRepository>();
-
-// Ensure database is created on startup
-using (var scope = builder.Services.BuildServiceProvider().CreateScope())
-{
-    var dbContext = scope.ServiceProvider.GetRequiredService<SecurityAdvisorDbContext>();
-    dbContext.Database.EnsureCreated();
-}
 
 // Register Azure DevOps connection factory
 builder.Services.AddSingleton<IAzureDevOpsConnectionFactory, AzureDevOpsConnectionFactory>();
@@ -259,7 +256,28 @@ builder.Services.AddScoped<ADOApi.Interfaces.ISemanticChatService, ADOApi.Servic
 builder.Services.AddScoped<ADOApi.Services.Chat.RepoChatAgentService>();
 builder.Services.AddScoped<ADOApi.Services.Chat.RepoChatContextBuilder>();
 
+// Configure CORS
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("DefaultCors", policy =>
+    {
+        var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
+            ?? new[] { "http://localhost:5173", "http://localhost:3000" };
+        policy.WithOrigins(allowedOrigins)
+              .AllowAnyHeader()
+              .AllowAnyMethod()
+              .AllowCredentials();
+    });
+});
+
 var app = builder.Build();
+
+// Ensure database is created on startup (after host build to avoid premature service provider)
+using (var scope = app.Services.CreateScope())
+{
+    var dbContext = scope.ServiceProvider.GetRequiredService<SecurityAdvisorDbContext>();
+    dbContext.Database.EnsureCreated();
+}
 
 // Fail-fast startup check for required secrets only in Production
 if (app.Environment.IsProduction())
@@ -286,13 +304,13 @@ if (app.Environment.IsProduction())
     }
 }
 
+// Add global exception handling (must be first to catch all exceptions)
+app.UseMiddleware<GlobalExceptionHandler>();
+
 if (app.Environment.IsDevelopment())
 {
-    app.UseDeveloperExceptionPage();
+    app.Logger.LogWarning("Running in Development mode: all authorization policies are bypassed");
 }
-
-// Add global exception handling
-app.UseMiddleware<GlobalExceptionHandler>();
 
 // Correlation and actor capture for audit
 app.UseMiddleware<ADOApi.Middleware.AuditCorrelationMiddleware>();
@@ -316,6 +334,7 @@ app.UseSwaggerUI(c =>
 });
 
 app.UseRouting();
+app.UseCors("DefaultCors");
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllerRoute(

@@ -17,7 +17,8 @@ namespace ADOApi.Services
         public OllamaClient(IHttpClientFactory httpClientFactory, IConfiguration configuration)
         {
             _httpClient = httpClientFactory.CreateClient("Ollama");
-            _httpClient.BaseAddress = new Uri("http://localhost:11434");
+            var baseUrl = configuration["Ollama:BaseUrl"] ?? "http://localhost:11434";
+            _httpClient.BaseAddress = new Uri(baseUrl);
             _httpClient.Timeout = TimeSpan.FromSeconds(30);
 
             _model = configuration["Ollama:Model"] ?? "qwen2.5-coder";
