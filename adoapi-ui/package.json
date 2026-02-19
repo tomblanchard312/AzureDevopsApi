@@ -17,7 +17,7 @@
     "@monaco-editor/react": "^4.7.0",
     "@mui/icons-material": "^7.3.7",
     "@mui/material": "^7.3.7",
-    "axios": "^1.13.2",
+    "axios": "^1.13.5",
     "diff": "^8.0.3",
     "monaco-editor": "^0.55.1",
     "notistack": "^3.0.2",
