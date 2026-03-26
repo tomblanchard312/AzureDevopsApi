@@ -45,16 +45,20 @@ jobs:
       - name: Generate CycloneDX SBOM for .NET
         run: |
           cd ADOApi
-          CycloneDX ADOApi.csproj --json --exclude-dev --output ../ --filename sbom-dotnet.json
+          # The CycloneDX .NET global tool exposes the CLI as `dotnet-CycloneDX`.
+          export PATH="$PATH:$HOME/.dotnet/tools"
+          dotnet-CycloneDX ADOApi.csproj --json --exclude-dev --output ../ --filename sbom-dotnet.json
           cd ..
 
       - name: Install React dependencies
+        if: ${{ env.ACT != 'true' }}
         run: |
           cd adoapi-ui
           npm ci
           cd ..
 
       - name: Generate CycloneDX SBOM for React
+        if: ${{ env.ACT != 'true' }}
         uses: anchore/sbom-action@v0
         with:
           path: adoapi-ui
@@ -63,6 +67,7 @@ jobs:
           format: cyclonedx-json
 
       - name: Merge SBOMs
+        if: ${{ env.ACT != 'true' }}
         run: |
           # Install jq for JSON manipulation
           sudo apt-get update && sudo apt-get install -y jq
@@ -94,6 +99,7 @@ jobs:
           }' sbom-dotnet.json sbom-react.json > sbom-merged.json
 
       - name: Upload SBOM artifacts
+        if: ${{ env.ACT != 'true' }}
         uses: actions/upload-artifact@v4
         with:
           name: sbom-artifacts
@@ -102,6 +108,7 @@ jobs:
           retention-days: 30
 
       - name: Run Trivy vulnerability scan
+        if: ${{ env.ACT != 'true' }}
         uses: aquasecurity/trivy-action@master
         with:
           scan-type: 'sbom'
@@ -114,6 +121,6 @@ jobs:
 
       - name: Upload Trivy scan results to GitHub Security tab
         uses: github/codeql-action/upload-sarif@v3
-        if: always()
+        if: ${{ env.ACT != 'true' && always() }}
         with:
           sarif_file: 'trivy-results.sarif'

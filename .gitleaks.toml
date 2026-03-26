@@ -31,11 +31,11 @@ allowlist = { regexes = ["[Stored in Key Vault]"] }
 [[rules]]
 id = "azure-tenant-id"
 description = "Azure Tenant ID"
-regex = '''[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}'''
+regex = '''(?i)(tenant(_|-)?id|tenantid)([\'\"]?[\s]*[=:][\s]*[\'\"]?)([a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12})'''
 allowlist = { regexes = ["[Your Tenant ID]"] }
 
 [[rules]]
 id = "azure-subscription-id"
 description = "Azure Subscription ID"
-regex = '''[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}'''
+regex = '''(?i)(subscription(_|-)?id|subscriptionid)([\'\"]?[\s]*[=:][\s]*[\'\"]?)([a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12})'''
 allowlist = { regexes = ["[Your Tenant ID]"] }

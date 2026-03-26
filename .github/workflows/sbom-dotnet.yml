@@ -26,7 +26,7 @@ jobs:
           dotnet-version: "8.0.x"
 
       - name: Restore .NET dependencies
-        run: dotnet restore
+        run: dotnet restore --disable-parallel
 
       - name: Install CycloneDX .NET tool
         run: dotnet tool install --global CycloneDX
@@ -34,7 +34,9 @@ jobs:
       - name: Generate .NET SBOM
         run: |
           mkdir -p sbom
-          CycloneDX ADOApi.sln \
+          # Global tool commands are installed under ~/.dotnet/tools; ensure PATH includes them.
+          export PATH="$PATH:$HOME/.dotnet/tools"
+          dotnet-CycloneDX ADOApi.sln \
             --json \
             --exclude-dev \
             --output sbom \
@@ -42,6 +44,9 @@ jobs:
 
       - name: Upload SBOM artifact
         uses: actions/upload-artifact@v4
+        # `act` does not provide `ACTIONS_RUNTIME_TOKEN`, which causes this step to fail locally.
+        # Skip artifact upload when running under `act`.
+        if: ${{ env.ACT != 'true' }}
         with:
           name: sbom-dotnet-cyclonedx
           path: sbom/sbom.dotnet.cdx.json

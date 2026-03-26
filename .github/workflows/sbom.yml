@@ -22,7 +22,12 @@ jobs:
 
       - name: Generate SBOM (CycloneDX - Repo)
         uses: anchore/sbom-action@v0
+        if: ${{ env.ACT != 'true' }}
         with:
           format: cyclonedx-json
           output-file: sbom.repo.cdx.json
           artifact-name: sbom-repo-cyclonedx
+          # `act` does not provide `github.token` (ACTIONS_RUNTIME_TOKEN / GITHUB_TOKEN),
+          # and this action requires auth when uploading artifacts.
+          # Skip artifact upload during local `act` runs.
+          upload-artifact: ${{ env.ACT != 'true' }}
