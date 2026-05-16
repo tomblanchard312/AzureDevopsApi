@@ -1,4 +1,4 @@
-import { createContext, useContext } from 'react';
+import { createContext } from 'react';
 
 interface AuthContextValue {
   isAuthResolved: boolean;
@@ -9,5 +9,3 @@ export const AuthContext = createContext<AuthContextValue>({
   isAuthResolved: false,
   isAuthConfigured: false,
 });
-
-export const useAuthContext = (): AuthContextValue => useContext(AuthContext);
