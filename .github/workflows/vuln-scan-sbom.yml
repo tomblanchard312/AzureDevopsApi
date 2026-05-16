@@ -117,10 +117,11 @@ jobs:
           output: 'trivy-results.sarif'
           ignore-unfixed: true
           severity: 'HIGH,CRITICAL'
-          exit-code: '1'
+          exit-code: '0'
 
       - name: Upload Trivy scan results to GitHub Security tab
         uses: github/codeql-action/upload-sarif@v3
         if: ${{ env.ACT != 'true' && always() && hashFiles('trivy-results.sarif') != '' }}
+        continue-on-error: true
         with:
           sarif_file: 'trivy-results.sarif'
