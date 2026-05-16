@@ -1,6 +1,7 @@
-import { useMsal } from '@azure/msal-react';
+import { MsalContext } from '@azure/msal-react';
+import { InteractionStatus } from '@azure/msal-browser';
 import { useMemo, useContext } from 'react';
-import { AuthContext } from './AuthProvider';
+import { AuthContext } from './AuthContext';
 
 interface IdTokenClaims {
   roles?: string[];
@@ -24,29 +25,15 @@ export const useAuth = (): AuthState & {
   logout: () => Promise<void>;
   hasRole: (role: string) => boolean;
 } => {
-  const { isAuthResolved } = useContext(AuthContext);
+  const { isAuthResolved, isAuthConfigured } = useContext(AuthContext);
+  const { instance, accounts, inProgress } = useContext(MsalContext);
 
   // Check if MSAL is available (not in configuration-needed state)
-  const msalAvailable = isAuthResolved;
-
-  let instance: any = null;
-  let accounts: any[] = [];
-  let inProgress: string = 'none';
-
-  if (msalAvailable) {
-    try {
-      const msalResult = useMsal();
-      instance = msalResult.instance;
-      accounts = msalResult.accounts;
-      inProgress = msalResult.inProgress;
-    } catch (error) {
-      // MSAL not available, continue with fallback
-    }
-  }
+  const msalAvailable = isAuthResolved && isAuthConfigured;
 
   const account = accounts[0];
   const isAuthenticated = msalAvailable ? accounts.length > 0 : false;
-  const isLoading = msalAvailable ? inProgress !== 'none' : false;
+  const isLoading = msalAvailable ? inProgress !== InteractionStatus.None : false;
 
   const user = useMemo((): UserInfo | null => {
     if (!msalAvailable || !account) return null;

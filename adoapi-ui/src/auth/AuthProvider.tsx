@@ -1,24 +1,14 @@
-import React, { useEffect, useState, createContext, useContext } from 'react';
+import React, { useEffect, useState } from 'react';
 import { PublicClientApplication, EventType } from '@azure/msal-browser';
 import type { AuthenticationResult, EventMessage } from '@azure/msal-browser';
 import { MsalProvider } from '@azure/msal-react';
 import { Box, CircularProgress, Typography } from '@mui/material';
+import { AuthContext } from './AuthContext';
 import { msalConfig, loginRequest } from './msalConfig';
 
 interface AuthProviderProps {
   children: React.ReactNode;
 }
-
-interface AuthContextValue {
-  isAuthResolved: boolean;
-}
-
-const AuthContext = createContext<AuthContextValue>({
-  isAuthResolved: false,
-});
-
-export { AuthContext };
-export const useAuthContext = () => useContext(AuthContext);
 
 const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [msalInstance, setMsalInstance] = useState<PublicClientApplication | null>(null);
@@ -178,7 +168,7 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   }
 
   return (
-    <AuthContext.Provider value={{ isAuthResolved }}>
+    <AuthContext.Provider value={{ isAuthResolved, isAuthConfigured: !needsConfiguration }}>
       {needsConfiguration ? (
         children
       ) : (
