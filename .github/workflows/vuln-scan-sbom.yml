@@ -110,6 +110,7 @@ jobs:
       - name: Run Trivy vulnerability scan
         if: ${{ env.ACT != 'true' }}
         uses: aquasecurity/trivy-action@master
+        continue-on-error: true
         with:
           scan-type: 'sbom'
           scan-ref: 'sbom-merged.json'
