@@ -89,7 +89,8 @@ namespace ADOApi.Controllers
                 {
                     if (!file.FileName.EndsWith(".md", System.StringComparison.OrdinalIgnoreCase) || file.FileName.Contains("/"))
                     {
-                        _logger.LogWarning("Skipping invalid file: {FileName}", file.FileName);
+                        var safeFileName = (file.FileName ?? string.Empty).Replace("\r", string.Empty).Replace("\n", string.Empty);
+                        _logger.LogWarning("Skipping invalid file: {FileName}", safeFileName);
                         continue; // Only .md files at root
                     }
 
